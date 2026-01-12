@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { Cat, HeartPulse, Syringe, Plus, X, Weight, FileDown, Pencil, CheckCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { logoBase64 } from '@/lib/logo'; // Import the logo
+import { logoBase64 } from '@/lib/logo';
+import { addSvgToPdf } from '@/lib/pdfUtils';
 
 export default function LivestockManagement() {
   const [animals, setAnimals] = useState<any[]>([]);
@@ -40,11 +41,9 @@ export default function LivestockManagement() {
       if (Array.isArray(data)) {
         setAnimals(data);
       } else {
-        console.error("API returned non-array:", data);
         setAnimals([]); 
       }
     } catch (error) {
-      console.error("Failed to fetch animals:", error);
       setAnimals([]);
     }
   }
@@ -55,23 +54,23 @@ export default function LivestockManagement() {
       fetch(`/api/livestock/history?type=treatments&id=${id}`),
       fetch(`/api/livestock/history?type=weights&id=${id}`)
     ]);
-    setVaccines(await vRes.json());
-    setTreatments(await tRes.json());
-    setWeights(await wRes.json());
+    if(vRes.ok) setVaccines(await vRes.json());
+    if(tRes.ok) setTreatments(await tRes.json());
+    if(wRes.ok) setWeights(await wRes.json());
   }
 
-  // --- PDF GENERATOR ---
-  function generateHealthBooklet() {
+  // --- PDF GENERATOR (UPDATED) ---
+  async function generateHealthBooklet() {
     if (!selectedAnimal) return;
     const doc = new jsPDF();
 
-    // Header
     doc.setFillColor(34, 197, 94);
     doc.rect(0, 0, 210, 40, 'F');
     
-    // Add Logo
+    // Use the async SVG helper
     if (logoBase64) {
-      doc.addImage(logoBase64, 'SVG', 15, 5, 30, 30);
+      const svgString = atob(logoBase64.split(',')[1]);
+      await addSvgToPdf(doc, svgString, 15, 5, 30, 30);
     }
 
     doc.setTextColor(255, 255, 255);
