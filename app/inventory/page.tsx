@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Package, AlertTriangle, TrendingDown, Plus, Search, X, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { Package, AlertTriangle, TrendingDown, Plus, Search, X, Loader2, Pencil, Trash2, CheckCircle } from 'lucide-react';
 
 export default function Inventory() {
   const [items, setItems] = useState<any[]>([]);
@@ -11,7 +11,10 @@ export default function Inventory() {
   // Modal & Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null); // New: Tracks item being edited
+  const [editingItem, setEditingItem] = useState<any>(null);
+
+  // Notification State
+  const [toast, setToast] = useState({ show: false, message: '' });
 
   // FETCH DATA
   useEffect(() => {
@@ -30,15 +33,24 @@ export default function Inventory() {
     }
   }
 
+  // SHOW NOTIFICATION HELPER
+  function showNotification(message: string) {
+    setToast({ show: true, message });
+    // Hide after 3 seconds
+    setTimeout(() => {
+        setToast({ show: false, message: '' });
+    }, 3000);
+  }
+
   // OPEN MODAL (ADD MODE)
   function openAddModal() {
-    setEditingItem(null); // Clear editing state
+    setEditingItem(null);
     setIsModalOpen(true);
   }
 
   // OPEN MODAL (EDIT MODE)
   function openEditModal(item: any) {
-    setEditingItem(item); // Set the item we are editing
+    setEditingItem(item);
     setIsModalOpen(true);
   }
 
@@ -46,14 +58,20 @@ export default function Inventory() {
   async function handleDelete(id: string) {
     if (!confirm('Are you sure you want to delete this item?')) return;
 
-    // Optimistic UI update (remove immediately)
-    setItems(items.filter(i => i.id !== id));
+    const previousItems = [...items];
+    setItems(items.filter(i => i.id !== id)); // Optimistic update
 
     try {
-      await fetch(`/api/inventory/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/inventory/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+          showNotification('Item deleted successfully');
+      } else {
+          throw new Error('Failed');
+      }
     } catch (error) {
       console.error("Failed to delete", error);
-      fetchInventory(); // Revert on error
+      setItems(previousItems); // Revert on error
+      alert("Failed to delete item.");
     }
   }
 
@@ -75,14 +93,14 @@ export default function Inventory() {
     try {
       let res;
       if (editingItem) {
-        // EDIT MODE (PUT)
+        // EDIT MODE
         res = await fetch(`/api/inventory/${editingItem.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
         });
       } else {
-        // ADD MODE (POST)
+        // ADD MODE
         res = await fetch('/api/inventory', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -93,11 +111,11 @@ export default function Inventory() {
       if (res.ok) {
         const savedItem = await res.json();
         if (editingItem) {
-            // Update item in list
             setItems(items.map(i => i.id === savedItem.id ? savedItem : i));
+            showNotification('Item updated successfully');
         } else {
-            // Add new item to list
             setItems([savedItem, ...items]);
+            showNotification('Item added successfully');
         }
         setIsModalOpen(false);
       }
@@ -120,7 +138,21 @@ export default function Inventory() {
   const totalValue = items.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.unit_price)), 0);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-8 max-w-7xl mx-auto relative">
+      
+      {/* SUCCESS TOAST NOTIFICATION */}
+      {toast.show && (
+        <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 animate-bounce z-50">
+            <div className="bg-green-500 rounded-full p-1">
+                <CheckCircle className="w-4 h-4 text-white" />
+            </div>
+            <div>
+                <h4 className="font-bold text-sm">Success</h4>
+                <p className="text-xs text-gray-300">{toast.message}</p>
+            </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
