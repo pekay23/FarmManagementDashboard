@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Cat, HeartPulse, Syringe, Plus, X, Weight, FileDown, Pencil } from 'lucide-react';
+import { Cat, HeartPulse, Syringe, Plus, X, Weight, FileDown, Pencil, CheckCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -18,6 +18,9 @@ export default function LivestockManagement() {
   const [modalType, setModalType] = useState<string | null>(null);
   const [editingAnimal, setEditingAnimal] = useState<any>(null);
 
+  // Notification State
+  const [toast, setToast] = useState({ show: false, message: '' });
+
   // --- DATA FETCHING ---
   useEffect(() => {
     fetchAnimals();
@@ -30,20 +33,21 @@ export default function LivestockManagement() {
   }, [selectedAnimal]);
 
   async function fetchAnimals() {
-  try {
-    const res = await fetch('/api/livestock');
-    const data = await res.json();
-    if (Array.isArray(data)) {
-      setAnimals(data);
-    } else {
-      console.error("API returned non-array:", data);
-      setAnimals([]); // Fallback to empty array
+    try {
+      const res = await fetch('/api/livestock');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setAnimals(data);
+      } else {
+        console.error("API returned non-array:", data);
+        setAnimals([]); 
+      }
+    } catch (error) {
+      console.error("Failed to fetch animals:", error);
+      setAnimals([]);
     }
-  } catch (error) {
-    console.error("Failed to fetch animals:", error);
-    setAnimals([]);
   }
-}
+
   async function fetchHistory(id: string) {
     const [vRes, tRes, wRes] = await Promise.all([
       fetch(`/api/livestock/history?type=vaccines&id=${id}`),
@@ -60,14 +64,12 @@ export default function LivestockManagement() {
     if (!selectedAnimal) return;
     const doc = new jsPDF();
 
-    // Header
-    doc.setFillColor(34, 197, 94); // Green
+    doc.setFillColor(34, 197, 94);
     doc.rect(0, 0, 210, 40, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.text("ANIMAL HEALTH BOOKLET", 105, 25, { align: "center" });
     
-    // Animal Info
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(12);
     doc.text(`ID: ${selectedAnimal.animal_id}`, 14, 50);
@@ -76,7 +78,6 @@ export default function LivestockManagement() {
     doc.text(`Gender: ${selectedAnimal.sex}`, 100, 58);
     doc.text(`Status: ${selectedAnimal.health_status}`, 100, 66);
 
-    // Vaccines Table
     doc.setFontSize(14);
     doc.setTextColor(34, 197, 94);
     doc.text("Vaccination Record", 14, 85);
@@ -86,7 +87,6 @@ export default function LivestockManagement() {
       body: vaccines.map(v => [new Date(v.vaccination_date).toLocaleDateString(), v.vaccine_name, v.batch_number, v.veterinarian]),
     });
 
-    // Treatments Table
     const finalY = (doc as any).lastAutoTable.finalY || 90;
     doc.text("Treatment History", 14, finalY + 15);
     autoTable(doc, {
@@ -99,6 +99,13 @@ export default function LivestockManagement() {
   }
 
   // --- HANDLERS ---
+  function showNotification(message: string) {
+    setToast({ show: true, message });
+    setTimeout(() => {
+        setToast({ show: false, message: '' });
+    }, 3000);
+  }
+
   async function handleSaveAnimal(e: any) {
     e.preventDefault();
     const formData = {
@@ -114,16 +121,19 @@ export default function LivestockManagement() {
     const method = editingAnimal ? 'PUT' : 'POST';
     const body = editingAnimal ? { ...formData, id: editingAnimal.id } : formData;
 
-    await fetch('/api/livestock', {
+    const res = await fetch('/api/livestock', {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
 
-    fetchAnimals();
-    setModalType(null);
-    if (editingAnimal && selectedAnimal && editingAnimal.id === selectedAnimal.id) {
-        setSelectedAnimal({ ...selectedAnimal, ...formData });
+    if (res.ok) {
+        fetchAnimals();
+        setModalType(null);
+        showNotification(editingAnimal ? 'Animal updated successfully' : 'Animal added successfully');
+        if (editingAnimal && selectedAnimal && editingAnimal.id === selectedAnimal.id) {
+            setSelectedAnimal({ ...selectedAnimal, ...formData });
+        }
     }
   }
 
@@ -158,20 +168,36 @@ export default function LivestockManagement() {
         };
     }
 
-    await fetch('/api/livestock/history', {
+    const res = await fetch('/api/livestock/history', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...baseData, ...specificData })
     });
 
-    fetchHistory(selectedAnimal.id);
-    if (type === 'weight') fetchAnimals(); // Refresh main list for new weight
-    setModalType(null);
+    if (res.ok) {
+        fetchHistory(selectedAnimal.id);
+        if (type === 'weight') fetchAnimals(); 
+        setModalType(null);
+        showNotification('Record saved successfully');
+    }
   }
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto min-h-screen">
+    <div className="p-8 max-w-[1600px] mx-auto min-h-screen relative">
       
+      {/* SUCCESS TOAST */}
+      {toast.show && (
+        <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 animate-bounce z-50">
+            <div className="bg-green-500 rounded-full p-1">
+                <CheckCircle className="w-4 h-4 text-white" />
+            </div>
+            <div>
+                <h4 className="font-bold text-sm">Success</h4>
+                <p className="text-xs text-gray-300">{toast.message}</p>
+            </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>

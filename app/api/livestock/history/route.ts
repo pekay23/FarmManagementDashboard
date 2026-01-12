@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
-  const type = searchParams.get('type'); // 'vaccines', 'treatments', 'weights'
+  const type = searchParams.get('type'); 
 
   if (!id || !type) return NextResponse.json([]);
 
@@ -19,9 +19,12 @@ export async function GET(request: Request) {
     } else if (type === 'weights') {
       data = await sql`SELECT * FROM livestock_weight_logs WHERE livestock_id = ${id} ORDER BY log_date DESC`;
     }
-    return NextResponse.json(data);
+    
+    // Safety check for array
+    const rows = Array.isArray(data) ? data : (data as any)?.rows || [];
+    return NextResponse.json(rows);
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch history' }, { status: 500 });
+    return NextResponse.json([], { status: 500 });
   }
 }
 
@@ -36,7 +39,7 @@ export async function POST(request: Request) {
       await sql`INSERT INTO livestock_treatments (livestock_id, condition, medication, treatment_date, dosage, duration, veterinarian, notes) VALUES (${livestock_id}, ${data.condition}, ${data.medication}, ${data.date}, ${data.dosage}, ${data.duration}, ${data.vet}, ${data.notes})`;
     } else if (type === 'weight') {
       await sql`INSERT INTO livestock_weight_logs (livestock_id, weight_kg, log_date, notes) VALUES (${livestock_id}, ${data.weight}, ${data.date}, ${data.notes})`;
-      // Also update main table
+      // Update main weight as well
       await sql`UPDATE livestock SET current_weight_kg = ${data.weight} WHERE id = ${livestock_id}`;
     }
 

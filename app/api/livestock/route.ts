@@ -5,23 +5,12 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    console.log("Fetching livestock...");
     const result = await sql`SELECT * FROM livestock ORDER BY created_at DESC`;
     
-    console.log("Raw DB Result:", result);
-
-    // Neon serverless driver usually returns the array of rows directly.
-    // But if it returns an object, we try to extract rows.
-    let rows = [];
-    if (Array.isArray(result)) {
-      rows = result;
-    } else if (result && typeof result === 'object' && Array.isArray((result as any).rows)) {
-      rows = (result as any).rows;
-    } else {
-        // Fallback: If we got a single object that looks like a row, wrap it
-        rows = [];
-    }
-
+    // Safety check: Ensure we return a clean array
+    // Sometimes the driver returns the array directly, sometimes inside a .rows property
+    const rows = Array.isArray(result) ? result : (result as any).rows || [];
+    
     return NextResponse.json(rows);
   } catch (error) {
     console.error("Database Error:", error);
@@ -40,9 +29,8 @@ export async function POST(request: Request) {
       RETURNING *
     `;
     
-    // Ensure we return the first item of the array
-    const created = Array.isArray(newAnimal) ? newAnimal[0] : newAnimal;
-    return NextResponse.json(created);
+    // Return the single created object
+    return NextResponse.json(Array.isArray(newAnimal) ? newAnimal[0] : newAnimal);
   } catch (error) {
     console.error("Insert Error:", error);
     return NextResponse.json({ error: 'Failed to add animal' }, { status: 500 });
@@ -66,9 +54,7 @@ export async function PUT(request: Request) {
       WHERE id = ${id}
       RETURNING *
     `;
-    
-    const item = Array.isArray(updated) ? updated[0] : updated;
-    return NextResponse.json(item);
+    return NextResponse.json(Array.isArray(updated) ? updated[0] : updated);
   } catch (error) {
     return NextResponse.json({ error: 'Failed to update animal' }, { status: 500 });
   }

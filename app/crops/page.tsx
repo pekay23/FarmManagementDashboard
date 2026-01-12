@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Sprout, MapPin, Calendar, BarChart3, Plus, X, Droplets, Pencil, Scissors, DollarSign } from 'lucide-react';
+import { Sprout, MapPin, Calendar, BarChart3, Plus, X, Droplets, Pencil, Scissors, DollarSign, CheckCircle } from 'lucide-react';
 
 export default function CropManagement() {
   const [crops, setCrops] = useState<any[]>([]);
@@ -11,17 +11,18 @@ export default function CropManagement() {
   // Modals
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
   const [isTreatmentModalOpen, setIsTreatmentModalOpen] = useState(false);
-  const [isYieldModalOpen, setIsYieldModalOpen] = useState(false); // New Modal State
+  const [isYieldModalOpen, setIsYieldModalOpen] = useState(false);
   
   // Editing State
   const [editingCrop, setEditingCrop] = useState<any>(null);
 
-  // Load Crops
+  // Notification State
+  const [toast, setToast] = useState({ show: false, message: '' });
+
   useEffect(() => {
     fetchCrops();
   }, []);
 
-  // Load Treatments when a crop is selected
   useEffect(() => {
     if (selectedCrop) {
       fetchTreatments(selectedCrop.id);
@@ -44,11 +45,8 @@ export default function CropManagement() {
     } catch (e) { console.error(e); }
   }
 
-  // --- LOGIC: Calculate Status Automatically ---
   function getCropStatus(plantingDate: string, harvestDate: string, actualYield: any) {
-    // If actual yield is recorded, it is definitely harvested
     if (actualYield && Number(actualYield) > 0) return 'harvested';
-
     if (!plantingDate) return 'unknown';
     
     const planted = new Date(plantingDate);
@@ -67,7 +65,12 @@ export default function CropManagement() {
     return 'growing';
   }
 
-  // --- HANDLERS ---
+  function showNotification(message: string) {
+    setToast({ show: true, message });
+    setTimeout(() => {
+        setToast({ show: false, message: '' });
+    }, 3000);
+  }
 
   function openAddCrop() {
     setEditingCrop(null);
@@ -80,11 +83,9 @@ export default function CropManagement() {
   }
 
   function openUpdateYield() {
-    // Open the dedicated Yield Modal
     setIsYieldModalOpen(true);
   }
 
-  // SAVE CROP (Add/Edit)
   async function handleSaveCrop(e: any) {
     e.preventDefault();
     const formData = {
@@ -96,26 +97,28 @@ export default function CropManagement() {
       plot_size_acres: e.target.plot_size_acres.value,
       location: e.target.location.value,
       estimated_yield_kg: e.target.estimated_yield_kg.value,
-      status: 'growing' // Default, will be overridden by logic
+      status: 'growing'
     };
 
     const method = editingCrop ? 'PUT' : 'POST';
     const body = editingCrop ? { ...formData, id: editingCrop.id } : formData;
 
-    await fetch('/api/crops', {
+    const res = await fetch('/api/crops', {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
 
-    fetchCrops();
-    setIsCropModalOpen(false);
-    if (editingCrop && selectedCrop && editingCrop.id === selectedCrop.id) {
-        setSelectedCrop({ ...selectedCrop, ...formData });
+    if (res.ok) {
+        fetchCrops();
+        setIsCropModalOpen(false);
+        showNotification(editingCrop ? 'Crop updated successfully' : 'Crop added successfully');
+        if (editingCrop && selectedCrop && editingCrop.id === selectedCrop.id) {
+            setSelectedCrop({ ...selectedCrop, ...formData });
+        }
     }
   }
 
-  // SAVE TREATMENT
   async function handleSaveTreatment(e: any) {
     e.preventDefault();
     if (!selectedCrop) return;
@@ -130,17 +133,19 @@ export default function CropManagement() {
       notes: e.target.notes.value
     };
 
-    await fetch('/api/treatments', {
+    const res = await fetch('/api/treatments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData)
     });
 
-    fetchTreatments(selectedCrop.id);
-    setIsTreatmentModalOpen(false);
+    if (res.ok) {
+        fetchTreatments(selectedCrop.id);
+        setIsTreatmentModalOpen(false);
+        showNotification('Treatment recorded successfully');
+    }
   }
 
-  // SAVE YIELD (The new function)
   async function handleSaveYield(e: any) {
     e.preventDefault();
     if (!selectedCrop) return;
@@ -148,28 +153,43 @@ export default function CropManagement() {
     const actualYield = e.target.actual_yield.value;
     const notes = e.target.harvest_notes.value;
 
-    // We update the existing crop record
     const body = {
-        ...selectedCrop, // Keep existing fields
+        ...selectedCrop,
         actual_yield_kg: actualYield,
         harvest_notes: notes,
-        status: 'harvested' // Force status to harvested if yield is added
+        status: 'harvested'
     };
 
-    await fetch('/api/crops', {
+    const res = await fetch('/api/crops', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
 
-    fetchCrops();
-    setSelectedCrop(body); // Update local view
-    setIsYieldModalOpen(false);
+    if (res.ok) {
+        fetchCrops();
+        setSelectedCrop(body);
+        setIsYieldModalOpen(false);
+        showNotification('Yield updated successfully');
+    }
   }
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto min-h-screen">
+    <div className="p-8 max-w-[1600px] mx-auto min-h-screen relative">
       
+      {/* SUCCESS TOAST */}
+      {toast.show && (
+        <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 animate-bounce z-50">
+            <div className="bg-green-500 rounded-full p-1">
+                <CheckCircle className="w-4 h-4 text-white" />
+            </div>
+            <div>
+                <h4 className="font-bold text-sm">Success</h4>
+                <p className="text-xs text-gray-300">{toast.message}</p>
+            </div>
+        </div>
+      )}
+
       {/* Header Row */}
       <div className="flex justify-between items-center mb-6">
         <div>
@@ -333,7 +353,7 @@ export default function CropManagement() {
         </Modal>
       )}
 
-      {/* MODAL: Update Yield (Matches IMG_4174) */}
+      {/* MODAL: Update Yield */}
       {isYieldModalOpen && selectedCrop && (
         <Modal title="Update Yield" onClose={() => setIsYieldModalOpen(false)}>
             <form onSubmit={handleSaveYield} className="space-y-4">
