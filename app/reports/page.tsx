@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { 
   Sprout, PawPrint, DollarSign, CheckCircle, FileDown, Calendar, Filter, 
-  ChevronDown, Layers, AlertCircle, Clock, Package, AlertTriangle, TrendingUp 
+  ChevronDown, Layers, AlertCircle, Clock, Package, AlertTriangle, TrendingUp, HeartPulse 
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -41,13 +41,13 @@ export default function Reports() {
   // --- HANDLERS TO PREVENT CRASHES ---
   const handleTypeChange = (e: any) => {
       setReportType(e.target.value);
-      setData(null); // Clear data immediately to prevent type mismatch
+      setData(null);
       setLoading(true);
   };
 
   const handlePeriodChange = (e: any) => {
       setPeriod(e.target.value);
-      setData(null); // Clear data immediately
+      setData(null);
       setLoading(true);
   };
 
@@ -75,7 +75,6 @@ export default function Reports() {
   // --- DYNAMIC CONTENT RENDERERS ---
 
   const renderKPIs = () => {
-    // Safety Check: If data doesn't match the requested type, don't render yet
     if (!data?.kpi) return null;
 
     switch (reportType) {
@@ -89,7 +88,6 @@ export default function Reports() {
                 </>
             );
         case 'sales':
-            // Use fallback (|| 0) to safely handle loading states
             return (
                 <>
                     <KpiCard title="Total Revenue" value={`GH₵ ${(data.kpi.total_revenue || 0).toLocaleString()}`} icon={DollarSign} color="purple" />
@@ -125,7 +123,10 @@ export default function Reports() {
         case 'livestock':
             return (
                 <>
-                    <KpiCard title="Total Animals" value={data.kpi.total || 0} icon={PawPrint} color="orange" />
+                    <KpiCard title="Total Records" value={data.kpi.total || 0} icon={Layers} color="blue" />
+                    <KpiCard title="Active Animals" value={data.kpi.active || 0} icon={PawPrint} color="green" />
+                    <KpiCard title="Sick / Injured" value={data.kpi.sick || 0} sub="Requires Attention" icon={HeartPulse} color="red" />
+                    <KpiCard title="Sold / Gone" value={data.kpi.sold || 0} icon={DollarSign} color="orange" />
                 </>
             );
         default:
@@ -232,17 +233,30 @@ export default function Reports() {
             );
         case 'livestock':
             return (
-                <div className="lg:col-span-2">
+                <>
                     <ChartCard title="Species Distribution">
                         <PieChart>
-                            <Pie data={data.charts.speciesDist} cx="50%" cy="50%" outerRadius={120} fill="#8884d8" dataKey="value" label>
+                            <Pie data={data.charts.speciesDist} cx="50%" cy="50%" outerRadius={100} fill="#8884d8" dataKey="value" label>
                                 {data.charts.speciesDist?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                             </Pie>
                             <Tooltip />
                             <Legend />
                         </PieChart>
                     </ChartCard>
-                </div>
+                    <ChartCard title="Health Status Breakdown">
+                        <BarChart data={data.charts.healthDist}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" />
+                            <YAxis allowDecimals={false} />
+                            <Tooltip cursor={{fill: 'transparent'}} />
+                            <Bar dataKey="value" name="Count" fill="#ef4444" radius={[4, 4, 0, 0]}>
+                                {data.charts.healthDist?.map((entry: any, index: number) => (
+                                    <Cell key={`cell-${index}`} fill={entry.name === 'Healthy' ? '#22c55e' : entry.name === 'Sick' ? '#ef4444' : '#eab308'} />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ChartCard>
+                </>
             );
         default:
             return null;
@@ -272,7 +286,7 @@ export default function Reports() {
                 <select 
                     className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-green-500 shadow-sm"
                     value={period}
-                    onChange={handlePeriodChange} // Updated Handler
+                    onChange={handlePeriodChange}
                 >
                     <option value="month">This Month</option>
                     <option value="year">This Year</option>
@@ -285,7 +299,7 @@ export default function Reports() {
                 <select 
                     className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-green-500 font-bold shadow-sm"
                     value={reportType}
-                    onChange={handleTypeChange} // Updated Handler
+                    onChange={handleTypeChange}
                 >
                     <option value="overview">Overview Report</option>
                     <option value="sales">Sales Report</option>

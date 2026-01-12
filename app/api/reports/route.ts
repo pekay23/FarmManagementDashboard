@@ -10,9 +10,6 @@ export async function GET(request: Request) {
 
   try {
     let result: any = { kpi: {}, charts: {} };
-
-    // --- DATE FILTER LOGIC ---
-    // Note: We apply this logic inside specific queries using SQL injection protection
     const interval = period === 'year' ? '1 year' : period === 'all' ? '100 years' : '30 days';
 
     // --- 1. OVERVIEW REPORT ---
@@ -21,7 +18,6 @@ export async function GET(request: Request) {
         const animalsCount = await sql`SELECT COUNT(*) FROM livestock`;
         const salesTotal = await sql`SELECT SUM(total_amount) FROM sales`;
         
-        // Task Completion
         const totalTasks = await sql`SELECT COUNT(*) FROM tasks`;
         const completedTasks = await sql`SELECT COUNT(*) FROM tasks WHERE status = 'completed'`;
         const completionRate = Number(totalTasks[0].count) > 0 
@@ -74,7 +70,6 @@ export async function GET(request: Request) {
         const totalItems = await sql`SELECT COUNT(*) FROM inventory`;
         const lowStock = await sql`SELECT COUNT(*) FROM inventory WHERE quantity <= min_threshold`;
         const totalValue = await sql`SELECT SUM(quantity * unit_price) FROM inventory`;
-
         const stockLevels = await sql`SELECT item_name as name, quantity as value FROM inventory ORDER BY quantity DESC LIMIT 10`;
 
         result.kpi = {
@@ -91,7 +86,6 @@ export async function GET(request: Request) {
         const completed = await sql`SELECT COUNT(*) FROM tasks WHERE status = 'completed'`;
         const overdue = await sql`SELECT COUNT(*) FROM tasks WHERE status != 'completed' AND due_date < CURRENT_DATE`;
         
-        // Corrected Query for Multi-Assignee Schema
         const empPerformance = await sql`
             SELECT e.full_name as name, COUNT(ta.task_id) as value 
             FROM employees e 
@@ -129,13 +123,22 @@ export async function GET(request: Request) {
         result.charts = { yieldComparison };
     }
 
-    // --- 6. LIVESTOCK REPORT ---
+    // --- 6. LIVESTOCK REPORT (UPDATED) ---
     else if (type === 'livestock') {
         const total = await sql`SELECT COUNT(*) FROM livestock`;
-        const speciesDist = await sql`SELECT species as name, COUNT(*) as value FROM livestock GROUP BY species`;
+        const sick = await sql`SELECT COUNT(*) FROM livestock WHERE health_status = 'Sick'`;
+        const sold = await sql`SELECT COUNT(*) FROM livestock WHERE health_status = 'Sold'`;
         
-        result.kpi = { total: Number(total[0].count) };
-        result.charts = { speciesDist };
+        const speciesDist = await sql`SELECT species as name, COUNT(*) as value FROM livestock GROUP BY species`;
+        const healthDist = await sql`SELECT health_status as name, COUNT(*) as value FROM livestock GROUP BY health_status`;
+        
+        result.kpi = { 
+            total: Number(total[0].count),
+            sick: Number(sick[0].count),
+            sold: Number(sold[0].count),
+            active: Number(total[0].count) - Number(sold[0].count)
+        };
+        result.charts = { speciesDist, healthDist };
     }
 
     return NextResponse.json(result);
