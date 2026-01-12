@@ -36,7 +36,6 @@ export default function Inventory() {
   // SHOW NOTIFICATION HELPER
   function showNotification(message: string) {
     setToast({ show: true, message });
-    // Hide after 3 seconds
     setTimeout(() => {
         setToast({ show: false, message: '' });
     }, 3000);
@@ -203,7 +202,10 @@ export default function Inventory() {
                     <th className="p-4 font-semibold">Item Name</th>
                     <th className="p-4 font-semibold">Category</th>
                     <th className="p-4 font-semibold">Quantity</th>
-                    <th className="p-4 font-semibold">Value</th>
+                    <th className="p-4 font-semibold">Min Threshold</th>
+                    <th className="p-4 font-semibold">Unit Price</th>
+                    <th className="p-4 font-semibold">Total Value</th>
+                    <th className="p-4 font-semibold">Last Updated</th>
                     <th className="p-4 font-semibold">Status</th>
                     <th className="p-4 font-semibold text-right">Actions</th>
                 </tr>
@@ -211,6 +213,11 @@ export default function Inventory() {
                 <tbody className="divide-y divide-gray-50">
                 {filteredItems.map((item: any) => {
                     const isLow = Number(item.quantity) <= Number(item.min_threshold);
+                    const totalValue = Number(item.quantity) * Number(item.unit_price);
+                    
+                    const dateObj = item.last_updated ? new Date(item.last_updated) : new Date();
+                    const dateStr = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
                     return (
                     <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                         <td className="p-4">
@@ -219,7 +226,10 @@ export default function Inventory() {
                         </td>
                         <td className="p-4"><span className="px-2 py-1 bg-gray-100 rounded-md text-xs">{item.category}</span></td>
                         <td className="p-4 font-medium">{item.quantity} {item.unit}</td>
-                        <td className="p-4 text-gray-600">GH₵ {(Number(item.quantity) * Number(item.unit_price)).toFixed(2)}</td>
+                        <td className="p-4 text-gray-500 text-sm">{item.min_threshold} {item.unit}</td>
+                        <td className="p-4 text-gray-600">GH₵ {Number(item.unit_price).toFixed(2)}</td>
+                        <td className="p-4 font-bold text-gray-800">GH₵ {totalValue.toFixed(2)}</td>
+                        <td className="p-4 text-xs text-gray-500 font-mono whitespace-nowrap">{dateStr}</td>
                         <td className="p-4">
                             <span className={`px-2 py-1 rounded-full text-xs font-bold ${isLow ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
                                 {isLow ? 'Low Stock' : 'In Stock'}

@@ -23,7 +23,7 @@ export async function PUT(
   props: { params: Promise<{ id: string }> }
 ) {
   try {
-    const params = await props.params; // Await the params first
+    const params = await props.params;
     const id = params.id;
     
     const body = await request.json();
@@ -37,7 +37,8 @@ export async function PUT(
           unit = ${unit}, 
           min_threshold = ${threshold}, 
           unit_price = ${price}, 
-          supplier = ${supplier}
+          supplier = ${supplier},
+          last_updated = CURRENT_TIMESTAMP  -- This updates the date automatically
       WHERE id = ${id}
       RETURNING *
     `;
