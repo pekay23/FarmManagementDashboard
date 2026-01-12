@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { logoBase64 } from '@/lib/logo';
 
 const COLORS = ['#22c55e', '#eab308', '#3b82f6', '#f97316', '#ef4444', '#8b5cf6'];
 
@@ -51,6 +52,11 @@ export default function Reports() {
     const doc = new jsPDF();
     doc.setFillColor(34, 197, 94);
     doc.rect(0, 0, 210, 40, 'F');
+    
+    if (logoBase64) {
+      doc.addImage(logoBase64, 'SVG', 15, 5, 30, 30);
+    }
+    
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.text(`${reportType.toUpperCase()} REPORT`, 105, 25, { align: "center" });

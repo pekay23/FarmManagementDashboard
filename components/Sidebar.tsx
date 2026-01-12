@@ -19,25 +19,25 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <div className="h-screen w-64 bg-green-900 text-white fixed left-0 top-0 flex flex-col z-50 shadow-xl">
-      {/* Branding */}
-      <div className="p-6 flex items-center space-x-3 border-b border-green-800">
-        <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center overflow-hidden shrink-0">
+    <div className="h-screen w-64 bg-green-900 text-white fixed left-0 top-0 flex flex-col z-50 shadow-2xl">
+      {/* --- BRANDING SECTION (OPTIMIZED FOR SVG) --- */}
+      <div className="p-4 flex items-center space-x-3 border-b border-green-800/50">
+        <div className="w-12 h-12 flex items-center justify-center shrink-0">
            <Image 
-             src="/farmslogo.png" 
+             src="/farmslogo.svg" // <<< Use the correct .svg extension
              alt="Hughes Farms Logo" 
-             width={40} 
-             height={40} 
-             className="object-cover"
+             width={48}
+             height={48} 
+             className="object-contain"
            />
         </div>
         <div>
-          <h1 className="text-lg font-bold leading-tight">Hughes Farms</h1>
-          <p className="text-[10px] text-green-300 font-medium">Farm Management</p>
+          <h1 className="text-lg font-extrabold leading-tight tracking-tight">Hughes Farms</h1>
+          <p className="text-[10px] text-green-300 font-medium opacity-80">Farm Management</p>
         </div>
       </div>
 
-      {/* Navigation */}
+      {/* --- NAVIGATION (IMPROVED) --- */}
       <nav className="flex-1 px-3 space-y-1 mt-6 overflow-y-auto">
         {menuItems.map((item) => {
           const isActive = pathname === item.href;
@@ -45,24 +45,24 @@ export default function Sidebar() {
             <Link
               key={item.name}
               href={item.href}
-              className={`flex items-center space-x-3 px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200
+              className={`flex items-center space-x-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all duration-200
                 ${isActive 
-                  ? 'bg-green-800 text-white shadow-md translate-x-1' 
-                  : 'text-green-100 hover:bg-green-800/50 hover:text-white'
+                  ? 'bg-white/10 text-white shadow-inner' 
+                  : 'text-green-100/80 hover:bg-white/5 hover:text-white'
                 }`}
             >
-              <item.icon className={`w-5 h-5 ${isActive ? 'text-yellow-400' : ''}`} />
+              <item.icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-yellow-400' : ''}`} />
               <span>{item.name}</span>
             </Link>
           );
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="p-6 border-t border-green-800 text-xs text-green-400">
+      {/* --- FOOTER --- */}
+      <div className="p-6 border-t border-green-800/50 text-xs text-green-300">
         <p className="font-semibold">Version 1.0.0</p>
         <div className="flex items-center mt-2">
-          <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+          <span className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></span>
           Online Mode
         </div>
       </div>

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Cat, HeartPulse, Syringe, Plus, X, Weight, FileDown, Pencil, CheckCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { logoBase64 } from '@/lib/logo'; // Import the logo
 
 export default function LivestockManagement() {
   const [animals, setAnimals] = useState<any[]>([]);
@@ -64,8 +65,15 @@ export default function LivestockManagement() {
     if (!selectedAnimal) return;
     const doc = new jsPDF();
 
+    // Header
     doc.setFillColor(34, 197, 94);
     doc.rect(0, 0, 210, 40, 'F');
+    
+    // Add Logo
+    if (logoBase64) {
+      doc.addImage(logoBase64, 'SVG', 15, 5, 30, 30);
+    }
+
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.text("ANIMAL HEALTH BOOKLET", 105, 25, { align: "center" });
@@ -96,6 +104,7 @@ export default function LivestockManagement() {
     });
 
     doc.save(`${selectedAnimal.animal_id}_Health_Booklet.pdf`);
+    showNotification('Health Booklet downloaded!');
   }
 
   // --- HANDLERS ---
@@ -397,6 +406,7 @@ export default function LivestockManagement() {
 }
 
 // --- Helpers ---
+
 function StatusBadge({ status }: { status: string }) {
   const styles: any = {
     healthy: 'bg-green-100 text-green-700',
