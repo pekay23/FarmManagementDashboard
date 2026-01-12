@@ -1,210 +1,237 @@
-// app/employees/page.tsx
 'use client';
 
-import { useState } from 'react';
-import { Users, Clock, AlertCircle, CheckCircle, Plus, Phone, Calendar, X } from 'lucide-react';
-
-// Mock Data (Matches IMG_4198)
-const initialEmployees = [
-  { id: 1, name: 'Samuel Adjei', role: 'Farm Supervisor', contact: '+233 24 111 2233', active: 1, completed: 0 },
-  { id: 2, name: 'Mary Ofosu', role: 'Livestock Caretaker', contact: '+233 20 444 5566', active: 1, completed: 1 },
-  { id: 3, name: 'John Ampong', role: 'Crop Specialist', contact: '+233 26 777 8899', active: 2, completed: 0 },
-  { id: 4, name: 'Esther Bonsu', role: 'Sales Assistant', contact: '+233 55 123 4567', active: 1, completed: 0 },
-];
-
-const initialTasks = [
-  { id: 1, title: 'Check irrigation system', desc: 'Inspect and test all irrigation lines', assign: 'Samuel Adjei', due: 'Mar 21', priority: 'medium', status: 'pending' },
-  { id: 2, title: 'Prepare sales report', desc: 'Compile weekly sales data for owner', assign: 'Esther Bonsu', due: 'Mar 18', priority: 'low', status: 'pending' },
-  { id: 3, title: 'Clean pig pens', desc: 'Weekly cleaning and disinfection', assign: 'Mary Ofosu', due: 'Mar 19', priority: 'medium', status: 'pending' },
-  { id: 4, title: 'Apply Fertilizer', desc: 'Plot A001 Maize field', assign: 'John Ampong', due: 'Mar 20', priority: 'high', status: 'overdue' },
-];
+import { useState, useEffect } from 'react';
+import { Users, Clock, AlertCircle, CheckCircle, Plus, Phone, X, Briefcase } from 'lucide-react';
 
 export default function EmployeeTaskManagement() {
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
+  
   const [activeModal, setActiveModal] = useState<'employee' | 'task' | null>(null);
+  const [toast, setToast] = useState({ show: false, message: '' });
 
-  const overdueCount = initialTasks.filter(t => t.status === 'overdue').length;
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  async function fetchData() {
+    try {
+        const [empRes, taskRes] = await Promise.all([
+            fetch('/api/employees'),
+            fetch('/api/tasks')
+        ]);
+        
+        const empData = await empRes.json();
+        const taskData = await taskRes.json();
+
+        if (Array.isArray(empData)) setEmployees(empData);
+        if (Array.isArray(taskData)) setTasks(taskData);
+    } catch (e) {
+        console.error("Failed to load data", e);
+    }
+  }
+
+  function showNotification(message: string) {
+    setToast({ show: true, message });
+    setTimeout(() => setToast({ show: false, message: '' }), 3000);
+  }
+
+  async function handleAddEmployee(e: any) {
+    e.preventDefault();
+    const body = {
+        full_name: e.target.full_name.value,
+        role: e.target.role.value,
+        contact_info: e.target.contact.value
+    };
+
+    const res = await fetch('/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+
+    if (res.ok) {
+        fetchData();
+        setActiveModal(null);
+        showNotification('Employee added successfully');
+    } else {
+        alert("Failed to add employee");
+    }
+  }
+
+  async function handleAddTask(e: any) {
+    e.preventDefault();
+    const body = {
+        title: e.target.title.value,
+        description: e.target.description.value,
+        assigned_to: e.target.assigned_to.value,
+        due_date: e.target.due_date.value,
+        priority: e.target.priority.value,
+        category: e.target.category.value
+    };
+
+    const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+
+    if (res.ok) {
+        fetchData();
+        setActiveModal(null);
+        showNotification('Task assigned successfully');
+    } else {
+        alert("Failed to add task");
+    }
+  }
+
+  async function toggleTaskStatus(task: any) {
+    const newStatus = task.status === 'pending' ? 'completed' : 'pending';
+    
+    const res = await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: task.id, status: newStatus })
+    });
+
+    if (res.ok) {
+        fetchData();
+        showNotification(newStatus === 'completed' ? 'Task marked completed' : 'Task reactivated');
+    }
+  }
+
+  const activeTaskCount = tasks.filter(t => t.status === 'pending').length;
+  const overdueCount = tasks.filter(t => t.status !== 'completed' && t.due_date && new Date(t.due_date) < new Date()).length;
+  const completedToday = tasks.filter(t => t.status === 'completed').length;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto min-h-screen">
+    <div className="p-8 max-w-7xl mx-auto min-h-screen relative">
       
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Employee & Task Management</h1>
-          <p className="text-gray-500">Manage your team and assign tasks</p>
+      {toast.show && (
+        <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 animate-bounce z-50">
+            <CheckCircle className="w-4 h-4 text-green-400" />
+            <p className="text-sm">{toast.message}</p>
         </div>
+      )}
+
+      {/* Header */}
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">Employee & Task Management</h1>
         <div className="flex gap-3">
-            <button 
-                onClick={() => setActiveModal('employee')}
-                className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors"
-            >
+            <button onClick={() => setActiveModal('employee')} className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium">
                 <Plus className="w-5 h-5" /> Add Employee
             </button>
-            <button 
-                onClick={() => setActiveModal('task')}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors"
-            >
+            <button onClick={() => setActiveModal('task')} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium">
                 <Plus className="w-5 h-5" /> Add Task
             </button>
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <KpiCard title="Total Employees" value="4" icon={Users} color="blue" />
-        <KpiCard title="Active Tasks" value="5" icon={Clock} color="yellow" />
-        <KpiCard title="Overdue Tasks" value={overdueCount.toString()} icon={AlertCircle} color="red" />
-        <KpiCard title="Completed Today" value="0" icon={CheckCircle} color="green" />
+        <KpiCard title="Total Employees" value={employees.length} icon={Users} color="blue" />
+        <KpiCard title="Active Tasks" value={activeTaskCount} icon={Clock} color="yellow" />
+        <KpiCard title="Overdue Tasks" value={overdueCount} icon={AlertCircle} color="red" />
+        <KpiCard title="Completed" value={completedToday} icon={CheckCircle} color="green" />
       </div>
 
-      {/* Alert Banner */}
-      {overdueCount > 0 && (
-          <div className="mb-8 bg-red-50 border border-red-100 p-4 rounded-xl flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />
-            <div>
-                <h3 className="font-bold text-red-700">Overdue Tasks</h3>
-                <p className="text-sm text-red-600">{overdueCount} task(s) are overdue and need immediate attention.</p>
-            </div>
-          </div>
-      )}
-
-      {/* Main Content Grid */}
+      {/* Content */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
-        {/* Left Column: Employees */}
+        {/* Employees */}
         <div>
             <h3 className="font-bold text-gray-800 text-lg mb-4">Employees</h3>
             <div className="space-y-4">
-                {initialEmployees.map(emp => (
+                {employees.map(emp => (
                     <div key={emp.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex justify-between items-start">
                         <div>
-                            <h4 className="font-bold text-gray-900">{emp.name}</h4>
-                            <p className="text-sm text-gray-500 mb-2">{emp.role}</p>
-                            <div className="flex items-center gap-2 text-xs text-gray-400">
-                                <Phone className="w-3 h-3" /> {emp.contact}
-                            </div>
+                            <h4 className="font-bold text-gray-900">{emp.full_name}</h4>
+                            <p className="text-sm text-gray-500">{emp.role}</p>
+                            <p className="text-xs text-gray-400 mt-1">{emp.contact_info}</p>
                         </div>
-                        <div className="text-right text-xs font-medium">
-                            <div className="text-yellow-600 mb-1">{emp.active} active</div>
-                            <div className="text-green-600">{emp.completed} completed</div>
+                        <div className="text-right text-xs">
+                            <div className="text-yellow-600 mb-1">{emp.active_count} active</div>
+                            <div className="text-green-600">{emp.completed_count} completed</div>
                         </div>
                     </div>
                 ))}
+                {employees.length === 0 && <p className="text-gray-400 italic">No employees found.</p>}
             </div>
         </div>
 
-        {/* Right Column: Recent Tasks */}
+        {/* Tasks */}
         <div>
             <h3 className="font-bold text-gray-800 text-lg mb-4">Recent Tasks</h3>
             <div className="space-y-4">
-                {initialTasks.map(task => (
-                    <div key={task.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
-                        {task.status === 'overdue' && <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500"></div>}
-                        
+                {tasks.map(task => {
+                    const isOverdue = task.status !== 'completed' && task.due_date && new Date(task.due_date) < new Date();
+                    const isCompleted = task.status === 'completed';
+                    return (
+                    <div key={task.id} className={`bg-white p-5 rounded-xl shadow-sm border ${isCompleted ? 'border-green-200 bg-green-50/30' : 'border-gray-100'}`}>
                         <div className="flex justify-between items-start mb-2">
-                            <h4 className="font-bold text-gray-900">{task.title}</h4>
-                            <span className={`text-xs px-2 py-1 rounded-full uppercase font-bold tracking-wide
-                                ${task.priority === 'high' ? 'bg-red-100 text-red-600' : 
-                                  task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 
-                                  'bg-green-100 text-green-700'}`}>
-                                {task.priority}
-                            </span>
+                            <h4 className={`font-bold ${isCompleted ? 'text-gray-500 line-through' : 'text-gray-900'}`}>{task.title}</h4>
+                            <span className="text-[10px] px-2 py-1 rounded-full bg-gray-100 uppercase font-bold text-gray-500">{task.priority}</span>
                         </div>
-                        
-                        <p className="text-sm text-gray-600 mb-4">{task.desc}</p>
-                        
-                        <div className="flex justify-between items-center text-xs">
-                            <div className="text-gray-500">
-                                Assigned to: <span className="font-medium text-gray-700">{task.assign}</span>
+                        <p className="text-sm text-gray-600 mb-4">{task.description}</p>
+                        <div className="flex justify-between items-end">
+                            <div className="text-xs">
+                                <p className="text-gray-500">Assigned: <span className="font-medium">{task.assignee_name || 'Unassigned'}</span></p>
+                                <p className={isOverdue ? 'text-red-500 font-bold' : 'text-blue-500'}>Due: {task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A'}</p>
                             </div>
-                            <div className={`font-medium ${task.status === 'overdue' ? 'text-red-500' : 'text-blue-500'}`}>
-                                Due: {task.due}
-                            </div>
+                            <button onClick={() => toggleTaskStatus(task)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 ${isCompleted ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600 hover:bg-green-600 hover:text-white'}`}>
+                                {isCompleted ? <><CheckCircle className="w-3 h-3"/> Done</> : 'Mark Complete'}
+                            </button>
                         </div>
-                        
-                        <button className="absolute bottom-4 right-4 text-gray-300 hover:text-green-500 transition-colors">
-                            <CheckCircle className="w-6 h-6" />
-                        </button>
                     </div>
-                ))}
+                )})}
+                {tasks.length === 0 && <p className="text-gray-400 italic">No tasks found.</p>}
             </div>
         </div>
       </div>
 
-      {/* --- MODALS --- */}
-      
-      {/* Add Employee Modal */}
+      {/* Modals */}
       {activeModal === 'employee' && (
-        <Modal title="Add New Employee" onClose={() => setActiveModal(null)}>
-            <form className="space-y-4">
-                <input type="text" placeholder="Full Name" className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" />
-                <input type="text" placeholder="Role/Position" className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" />
-                <input type="text" placeholder="Contact (Phone/Email)" className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" />
-                
-                <div className="flex gap-4 mt-6">
-                    <button type="button" onClick={() => setActiveModal(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 py-3 rounded-lg font-medium transition-colors">Cancel</button>
-                    <button type="button" className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-medium transition-colors">Add Employee</button>
-                </div>
+        <Modal title="Add Employee" onClose={() => setActiveModal(null)}>
+            <form onSubmit={handleAddEmployee} className="space-y-4">
+                <input name="full_name" required placeholder="Full Name" className="w-full border p-3 rounded-lg outline-none focus:border-green-500" />
+                <input name="role" required placeholder="Role" className="w-full border p-3 rounded-lg outline-none focus:border-green-500" />
+                <input name="contact" required placeholder="Contact" className="w-full border p-3 rounded-lg outline-none focus:border-green-500" />
+                <button className="w-full bg-green-600 text-white py-3 rounded-lg font-bold">Save Employee</button>
             </form>
         </Modal>
       )}
 
-      {/* Add Task Modal */}
       {activeModal === 'task' && (
-        <Modal title="Add New Task" onClose={() => setActiveModal(null)}>
-            <form className="space-y-4">
-                <input type="text" placeholder="Task Title" className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" />
-                <textarea rows={3} placeholder="Task Description" className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none resize-none" />
-                
-                <select className="w-full border border-gray-300 p-3 rounded-lg bg-white focus:ring-2 focus:ring-green-500 outline-none">
-                    <option>Assign to Employee</option>
-                    <option>Samuel Adjei</option>
-                    <option>Mary Ofosu</option>
+        <Modal title="Add Task" onClose={() => setActiveModal(null)}>
+            <form onSubmit={handleAddTask} className="space-y-4">
+                <input name="title" required placeholder="Title" className="w-full border p-3 rounded-lg outline-none focus:border-green-500" />
+                <textarea name="description" rows={3} placeholder="Description" className="w-full border p-3 rounded-lg resize-none outline-none focus:border-green-500" />
+                <select name="assigned_to" className="w-full border p-3 rounded-lg bg-white outline-none focus:border-green-500">
+                    <option value="">Unassigned</option>
+                    {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
                 </select>
-
                 <div className="grid grid-cols-2 gap-4">
-                    <input type="date" className="w-full border border-gray-300 p-3 rounded-lg text-gray-500 focus:ring-2 focus:ring-green-500 outline-none" />
-                    <select className="w-full border border-gray-300 p-3 rounded-lg bg-white focus:ring-2 focus:ring-green-500 outline-none">
-                        <option>Select Priority</option>
-                        <option>Low</option>
-                        <option>Medium</option>
-                        <option>High</option>
+                    <input name="due_date" type="date" required className="w-full border p-3 rounded-lg text-gray-500 outline-none focus:border-green-500" />
+                    <select name="priority" className="w-full border p-3 rounded-lg bg-white outline-none focus:border-green-500">
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="low">Low</option>
                     </select>
                 </div>
-
-                <input type="text" placeholder="Category (e.g., Feeding, Harvesting)" className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" />
-
-                <div className="flex gap-4 mt-6">
-                    <button type="button" onClick={() => setActiveModal(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 py-3 rounded-lg font-medium transition-colors">Cancel</button>
-                    <button type="button" className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-medium transition-colors">Add Task</button>
-                </div>
+                <input name="category" placeholder="Category" className="w-full border p-3 rounded-lg outline-none focus:border-green-500" />
+                <button className="w-full bg-green-600 text-white py-3 rounded-lg font-bold">Save Task</button>
             </form>
         </Modal>
       )}
-
     </div>
   );
 }
 
-// --- Helper Components ---
-
 function KpiCard({ title, value, icon: Icon, color }: any) {
-    const colors: any = {
-      blue: "bg-blue-50 text-blue-600",
-      yellow: "bg-yellow-50 text-yellow-600",
-      red: "bg-red-50 text-red-600",
-      green: "bg-green-50 text-green-600"
-    };
-  
+    const colors: any = { blue: "bg-blue-50 text-blue-600", yellow: "bg-yellow-50 text-yellow-600", red: "bg-red-50 text-red-600", green: "bg-green-50 text-green-600" };
     return (
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-        <div className={`p-3 rounded-lg ${colors[color]}`}>
-          <Icon className="w-6 h-6" />
-        </div>
-        <div>
-          <p className="text-sm text-gray-500 font-medium">{title}</p>
-          <h3 className="text-2xl font-bold text-gray-900">{value}</h3>
-        </div>
+        <div className={`p-3 rounded-lg ${colors[color]}`}><Icon className="w-6 h-6" /></div>
+        <div><p className="text-sm text-gray-500 font-medium">{title}</p><h3 className="text-2xl font-bold text-gray-900">{value}</h3></div>
       </div>
     );
 }
@@ -212,14 +239,12 @@ function KpiCard({ title, value, icon: Icon, color }: any) {
 function Modal({ title, children, onClose }: any) {
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={onClose}>
-            <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl transform transition-all" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center p-6 border-b border-gray-100">
+            <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl p-6 relative" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-4 border-b pb-4">
                     <h2 className="text-xl font-bold text-gray-900">{title}</h2>
                     <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600" /></button>
                 </div>
-                <div className="p-6">
-                    {children}
-                </div>
+                {children}
             </div>
         </div>
     )
