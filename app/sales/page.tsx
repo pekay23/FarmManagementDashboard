@@ -21,7 +21,7 @@ export default function SalesReceipts() {
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false); // New Modal
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Form State
   const [cartItems, setCartItems] = useState([{ id: 1, name: '', qty: 1, price: 0 }]);
@@ -34,7 +34,7 @@ export default function SalesReceipts() {
 
   // Calculations
   const subtotal = cartItems.reduce((acc, item) => acc + (Number(item.qty) * Number(item.price)), 0);
-  const taxAmount = (subtotal * (Number(settings.tax_rate) / 100));
+  const taxAmount = subtotal * (Number(settings.tax_rate) / 100);
   const total = subtotal + taxAmount;
 
   useEffect(() => {
@@ -127,8 +127,6 @@ export default function SalesReceipts() {
         fetchInventory();
         setIsModalOpen(false);
         showNotification('Sale recorded successfully!');
-        
-        // Reset Form
         setBuyerName('');
         setContact('');
         setCartItems([{ id: Date.now(), name: '', qty: 1, price: 0 }]);
@@ -159,22 +157,24 @@ export default function SalesReceipts() {
     }
   }
 
-  function generateReceipt(sale: any) {
+    function generateReceipt(sale: any) {
     const doc = new jsPDF();
     
+    // NOTE: Standard PDF fonts usually cannot render the '₵' symbol.
+    // We use the official ISO code "GHS" for the PDF to ensure it prints correctly.
+    const currency = "GHS"; 
+
     // Header
     doc.setFillColor(20, 20, 20);
-    doc.rect(0, 0, 210, 50, 'F'); // Taller header for more info
+    doc.rect(0, 0, 210, 50, 'F');
     doc.setTextColor(255, 255, 255);
     
-    // Farm Info (From Settings)
     doc.setFontSize(22);
     doc.text(settings.farm_name, 105, 20, { align: "center" });
     
     doc.setFontSize(10);
     doc.text("Official Sales Receipt", 105, 28, { align: "center" });
     
-    // Contact Subtitle
     let contactLine = "";
     if (settings.phone) contactLine += `Tel: ${settings.phone}  `;
     if (settings.email) contactLine += `Email: ${settings.email}`;
@@ -184,7 +184,6 @@ export default function SalesReceipts() {
         doc.text(settings.address, 105, 42, { align: "center" });
     }
 
-    // Receipt Details
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(11);
     doc.text(`Receipt #: ${sale.id.slice(0, 8).toUpperCase()}`, 14, 65);
@@ -192,7 +191,6 @@ export default function SalesReceipts() {
     doc.text(`Buyer: ${sale.buyer_name}`, 14, 77);
     doc.text(`Contact: ${sale.contact_info || 'N/A'}`, 14, 83);
 
-    // Items Table
     const items = sale.items_data || [];
     autoTable(doc, {
         startY: 90,
@@ -207,12 +205,12 @@ export default function SalesReceipts() {
         headStyles: { fillColor: [34, 197, 94] }
     });
 
-    // Totals
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFontSize(14);
-    doc.text(`TOTAL: GH₵ ${Number(sale.total_amount).toFixed(2)}`, 190, finalY, { align: "right" });
+    let finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(12);
+    
+    // Using "GHS" ensures the currency is readable
+    doc.text(`TOTAL: ${currency} ${Number(sale.total_amount).toFixed(2)}`, 190, finalY, { align: "right" });
 
-    // Footer
     if (settings.receipt_footer) {
         doc.setFontSize(10);
         doc.setTextColor(100, 100, 100);
@@ -221,6 +219,7 @@ export default function SalesReceipts() {
 
     doc.save(`Receipt_${sale.buyer_name}.pdf`);
   }
+
 
   return (
     <div className="p-8 max-w-7xl mx-auto min-h-screen relative">
@@ -333,6 +332,7 @@ export default function SalesReceipts() {
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Tax Rate (%)</label>
                             <input name="tax" type="number" step="0.1" defaultValue={settings.tax_rate} className="w-full border p-2.5 rounded-lg outline-none focus:border-blue-500" />
+                            <p className="text-xs text-gray-400 mt-1">Example: 3.0 for VFRS or 15.0 for VAT</p>
                         </div>
                     </div>
                     <div>
@@ -427,7 +427,15 @@ export default function SalesReceipts() {
                 </div>
 
                 <div className="bg-gray-50 p-4 rounded-lg space-y-2 border border-gray-100">
-                    <div className="flex justify-between font-bold text-lg text-gray-900">
+                    <div className="flex justify-between text-sm text-gray-600">
+                        <span>Subtotal:</span>
+                        <span>GH₵ {subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-gray-600">
+                        <span>Tax ({settings.tax_rate}%):</span>
+                        <span>GH₵ {taxAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-lg text-gray-900 border-t border-gray-200 pt-2">
                         <span>Total:</span>
                         <span>GH₵ {total.toFixed(2)}</span>
                     </div>
