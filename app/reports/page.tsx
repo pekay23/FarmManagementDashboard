@@ -12,6 +12,7 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { logoBase64 } from '@/lib/logo';
+import { addSvgToPdf } from '@/lib/pdfUtils'; // Import the SVG helper
 
 const COLORS = ['#22c55e', '#eab308', '#3b82f6', '#f97316', '#ef4444', '#8b5cf6'];
 
@@ -32,11 +33,7 @@ export default function Reports() {
       const res = await fetch(`/api/reports?type=${reportType}&period=${period}`);
       const json = await res.json();
       setData(json);
-    } catch (e) { 
-      console.error(e); 
-    } finally { 
-      setLoading(false); 
-    }
+    } catch (e) { console.error(e); } finally { setLoading(false); }
   }
 
   const handleTypeChange = (e: any) => { setReportType(e.target.value); setData(null); setLoading(true); };
@@ -47,21 +44,23 @@ export default function Reports() {
     setTimeout(() => setToast({ show: false, message: '' }), 3000);
   }
 
-  function generatePDF() {
+  // UPDATED PDF Function
+  async function generatePDF() {
     if (!data) return;
     const doc = new jsPDF();
     doc.setFillColor(34, 197, 94);
     doc.rect(0, 0, 210, 40, 'F');
     
     if (logoBase64) {
-      doc.addImage(logoBase64, 'SVG', 15, 5, 30, 30);
+      const svgString = atob(logoBase64.split(',')[1]);
+      await addSvgToPdf(doc, svgString, 15, 5, 30, 30);
     }
     
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.text(`${reportType.toUpperCase()} REPORT`, 105, 25, { align: "center" });
     
-    const kpiRows = Object.entries(data.kpi).map(([key, val]: any) => [key.replace('_', ' ').toUpperCase(), val]);
+    const kpiRows = Object.entries(data.kpi).map(([key, val]: any) => [key.replace(/_/g, ' ').toUpperCase(), val]);
     autoTable(doc, { startY: 65, head: [['Metric', 'Value']], body: kpiRows });
     
     doc.save(`${reportType}_Report.pdf`);
@@ -77,8 +76,8 @@ export default function Reports() {
         case 'overview':
             return (
                 <>
-                    <KpiCard title="Total Crops" value={data.kpi.crops} sub="+12% from last period" icon={Sprout} color="green" />
-                    <KpiCard title="Total Animals" value={data.kpi.animals} sub="+8% from last period" icon={PawPrint} color="blue" />
+                    <KpiCard title="Total Crops" value={data.kpi.crops || 0} sub="+12% from last period" icon={Sprout} color="green" />
+                    <KpiCard title="Total Animals" value={data.kpi.animals || 0} sub="+8% from last period" icon={PawPrint} color="blue" />
                     <KpiCard title="Total Sales" value={`GH₵ ${(data.kpi.sales || 0).toLocaleString()}`} sub="+23% from last period" icon={DollarSign} color="purple" />
                     <KpiCard title="Task Completion" value={`${data.kpi.completion_rate || 0}%`} sub="+5% from last period" icon={TrendingUp} color="orange" />
                 </>
@@ -183,7 +182,6 @@ export default function Reports() {
                             </AreaChart>
                         </ChartCard>
                     </div>
-                    {/* NEW: Top Selling Items */}
                     <div className="lg:col-span-2">
                         <ChartCard title="Top Selling Products">
                             <BarChart data={data.charts.topItems} layout="vertical">
@@ -209,7 +207,6 @@ export default function Reports() {
                             <Bar dataKey="value" name="Quantity" fill="#3b82f6" barSize={20} radius={[0, 4, 4, 0]} />
                         </BarChart>
                     </ChartCard>
-                    {/* NEW: Value by Category */}
                     <ChartCard title="Value by Category">
                         <PieChart>
                             <Pie data={data.charts.categoryValue} cx="50%" cy="50%" innerRadius={60} outerRadius={100} fill="#8884d8" dataKey="value">
@@ -233,7 +230,6 @@ export default function Reports() {
                             <Bar dataKey="value" name="Tasks" fill="#f97316" barSize={40} radius={[4, 4, 0, 0]} />
                         </BarChart>
                     </ChartCard>
-                    {/* NEW: Priority Distribution */}
                     <ChartCard title="Pending Tasks by Priority">
                         <PieChart>
                             <Pie data={data.charts.priorityDist} cx="50%" cy="50%" outerRadius={100} fill="#8884d8" dataKey="value" label>
@@ -261,7 +257,6 @@ export default function Reports() {
                             <Bar dataKey="actual" name="Act. Yield (kg)" fill="#22c55e" radius={[4, 4, 0, 0]} />
                         </BarChart>
                     </ChartCard>
-                    {/* NEW: Land Usage */}
                     <ChartCard title="Land Usage (Acres)">
                         <PieChart>
                             <Pie data={data.charts.landUsage} cx="50%" cy="50%" outerRadius={100} fill="#8884d8" dataKey="value" label>
@@ -298,7 +293,6 @@ export default function Reports() {
                             </Bar>
                         </BarChart>
                     </ChartCard>
-                    {/* NEW: Gender Distribution */}
                     <div className="lg:col-span-2">
                         <ChartCard title="Gender Distribution">
                             <BarChart data={data.charts.genderDist} layout="vertical" margin={{ left: 20 }}>
@@ -320,7 +314,6 @@ export default function Reports() {
   return (
     <div className="p-8 max-w-[1600px] mx-auto min-h-screen relative">
       
-      {/* Toast */}
       {toast.show && (
         <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 animate-bounce z-50">
             <CheckCircle className="w-4 h-4 text-green-400" />
@@ -328,7 +321,6 @@ export default function Reports() {
         </div>
       )}
 
-      {/* Header & Filters */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
@@ -365,12 +357,9 @@ export default function Reports() {
 
       {loading || !data ? <div className="text-center py-20 text-gray-400">Loading data...</div> : (
         <>
-            {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
                 {renderKPIs()}
             </div>
-
-            {/* Charts Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {renderCharts()}
             </div>
