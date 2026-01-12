@@ -16,9 +16,10 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { name, category, quantity, unit, threshold, price, supplier } = body;
 
+    // Added 'supplier' to the INSERT statement
     const newItem = await sql`
-      INSERT INTO inventory (item_name, category, quantity, unit, min_threshold, unit_price, status)
-      VALUES (${name}, ${category}, ${quantity}, ${unit}, ${threshold}, ${price}, 'In Stock')
+      INSERT INTO inventory (item_name, category, quantity, unit, min_threshold, unit_price, status, supplier)
+      VALUES (${name}, ${category}, ${quantity}, ${unit}, ${threshold}, ${price}, 'In Stock', ${supplier})
       RETURNING *
     `;
     
@@ -28,3 +29,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to add item' }, { status: 500 });
   }
 }
+
