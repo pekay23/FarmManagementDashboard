@@ -1,14 +1,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ShoppingCart, DollarSign, Calendar, TrendingUp, Plus, X, FileText, Trash2, CheckCircle } from 'lucide-react';
+import { ShoppingCart, DollarSign, Calendar, TrendingUp, Plus, X, FileText, Trash2, CheckCircle, Settings, Save } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 export default function SalesReceipts() {
   const [sales, setSales] = useState<any[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
+  
+  // Settings State
+  const [settings, setSettings] = useState<any>({
+    farm_name: 'Hughes Farms',
+    phone: '',
+    email: '',
+    address: '',
+    receipt_footer: 'Thank you for your business!',
+    tax_rate: 0
+  });
+
+  // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false); // New Modal
 
   // Form State
   const [cartItems, setCartItems] = useState([{ id: 1, name: '', qty: 1, price: 0 }]);
@@ -21,23 +34,37 @@ export default function SalesReceipts() {
 
   // Calculations
   const subtotal = cartItems.reduce((acc, item) => acc + (Number(item.qty) * Number(item.price)), 0);
-  const total = subtotal;
+  const taxAmount = (subtotal * (Number(settings.tax_rate) / 100));
+  const total = subtotal + taxAmount;
 
   useEffect(() => {
     fetchSales();
     fetchInventory();
+    fetchSettings();
   }, []);
 
   async function fetchSales() {
-    const res = await fetch('/api/sales');
-    const data = await res.json();
-    if (Array.isArray(data)) setSales(data);
+    try {
+        const res = await fetch('/api/sales');
+        const data = await res.json();
+        if (Array.isArray(data)) setSales(data);
+    } catch (e) { console.error(e); }
   }
 
   async function fetchInventory() {
-    const res = await fetch('/api/inventory');
-    const data = await res.json();
-    if (Array.isArray(data)) setInventory(data);
+    try {
+        const res = await fetch('/api/inventory');
+        const data = await res.json();
+        if (Array.isArray(data)) setInventory(data);
+    } catch (e) { console.error(e); }
+  }
+
+  async function fetchSettings() {
+    try {
+        const res = await fetch('/api/settings');
+        const data = await res.json();
+        if (data.id) setSettings(data);
+    } catch (e) { console.error(e); }
   }
 
   // --- ACTIONS ---
@@ -99,7 +126,7 @@ export default function SalesReceipts() {
         fetchSales();
         fetchInventory();
         setIsModalOpen(false);
-        showNotification('Sale recorded successfully!'); // Toast Trigger
+        showNotification('Sale recorded successfully!');
         
         // Reset Form
         setBuyerName('');
@@ -108,25 +135,67 @@ export default function SalesReceipts() {
     }
   }
 
+  async function handleSaveSettings(e: any) {
+    e.preventDefault();
+    const formData = {
+        farm_name: e.target.farm_name.value,
+        phone: e.target.phone.value,
+        email: e.target.email.value,
+        address: e.target.address.value,
+        receipt_footer: e.target.footer.value,
+        tax_rate: e.target.tax.value
+    };
+
+    const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+    });
+
+    if (res.ok) {
+        setSettings(formData);
+        setIsSettingsOpen(false);
+        showNotification('Receipt settings saved!');
+    }
+  }
+
   function generateReceipt(sale: any) {
     const doc = new jsPDF();
+    
+    // Header
     doc.setFillColor(20, 20, 20);
-    doc.rect(0, 0, 210, 40, 'F');
+    doc.rect(0, 0, 210, 50, 'F'); // Taller header for more info
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
-    doc.text("Hughes Farms", 105, 20, { align: "center" });
+    
+    // Farm Info (From Settings)
+    doc.setFontSize(22);
+    doc.text(settings.farm_name, 105, 20, { align: "center" });
+    
     doc.setFontSize(10);
-    doc.text("Official Sales Receipt", 105, 30, { align: "center" });
+    doc.text("Official Sales Receipt", 105, 28, { align: "center" });
+    
+    // Contact Subtitle
+    let contactLine = "";
+    if (settings.phone) contactLine += `Tel: ${settings.phone}  `;
+    if (settings.email) contactLine += `Email: ${settings.email}`;
+    doc.text(contactLine, 105, 36, { align: "center" });
+    
+    if (settings.address) {
+        doc.text(settings.address, 105, 42, { align: "center" });
+    }
 
+    // Receipt Details
     doc.setTextColor(0, 0, 0);
-    doc.text(`Receipt #: ${sale.id.slice(0, 8).toUpperCase()}`, 14, 50);
-    doc.text(`Date: ${new Date(sale.sale_date).toLocaleDateString()}`, 14, 56);
-    doc.text(`Buyer: ${sale.buyer_name}`, 14, 62);
-    doc.text(`Contact: ${sale.contact_info || 'N/A'}`, 14, 68);
+    doc.setFontSize(11);
+    doc.text(`Receipt #: ${sale.id.slice(0, 8).toUpperCase()}`, 14, 65);
+    doc.text(`Date: ${new Date(sale.sale_date).toLocaleDateString()}`, 14, 71);
+    doc.text(`Buyer: ${sale.buyer_name}`, 14, 77);
+    doc.text(`Contact: ${sale.contact_info || 'N/A'}`, 14, 83);
 
+    // Items Table
     const items = sale.items_data || [];
     autoTable(doc, {
-        startY: 75,
+        startY: 90,
         head: [['Item', 'Qty', 'Price', 'Total']],
         body: items.map((i: any) => [
             i.name, 
@@ -138,9 +207,17 @@ export default function SalesReceipts() {
         headStyles: { fillColor: [34, 197, 94] }
     });
 
+    // Totals
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFontSize(14);
-    doc.text(`TOTAL: GHC ${Number(sale.total_amount).toFixed(2)}`, 190, finalY, { align: "right" });
+    doc.text(`TOTAL: GH₵ ${Number(sale.total_amount).toFixed(2)}`, 190, finalY, { align: "right" });
+
+    // Footer
+    if (settings.receipt_footer) {
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text(settings.receipt_footer, 105, 280, { align: "center" });
+    }
 
     doc.save(`Receipt_${sale.buyer_name}.pdf`);
   }
@@ -168,16 +245,19 @@ export default function SalesReceipts() {
           <p className="text-gray-500">Record sales and generate professional receipts</p>
         </div>
         <div className="flex gap-3">
-            <button className="bg-gray-800 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-900 transition-colors shadow-sm flex items-center gap-2">
-                <FileText className="w-4 h-4" />
+            <button 
+                onClick={() => setIsSettingsOpen(true)}
+                className="bg-gray-800 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-900 transition-colors shadow-sm flex items-center gap-2"
+            >
+                <Settings className="w-4 h-4" />
                 Receipt Settings
             </button>
             <button 
-            onClick={() => setIsModalOpen(true)}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors shadow-green-200 shadow-lg"
+                onClick={() => setIsModalOpen(true)}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors shadow-green-200 shadow-lg"
             >
-            <Plus className="w-5 h-5" />
-            New Sale
+                <Plus className="w-5 h-5" />
+                New Sale
             </button>
         </div>
       </div>
@@ -231,6 +311,50 @@ export default function SalesReceipts() {
           </table>
         </div>
       </div>
+
+      {/* MODAL: Receipt Settings */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-xl w-full max-w-md shadow-2xl">
+                <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                    <h2 className="text-xl font-bold text-gray-900">Receipt Configuration</h2>
+                    <button onClick={() => setIsSettingsOpen(false)}><X className="text-gray-400 hover:text-gray-600" /></button>
+                </div>
+                <form onSubmit={handleSaveSettings} className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Farm / Business Name</label>
+                        <input name="farm_name" required defaultValue={settings.farm_name} className="w-full border p-2.5 rounded-lg outline-none focus:border-blue-500" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                            <input name="phone" defaultValue={settings.phone} placeholder="+233..." className="w-full border p-2.5 rounded-lg outline-none focus:border-blue-500" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Tax Rate (%)</label>
+                            <input name="tax" type="number" step="0.1" defaultValue={settings.tax_rate} className="w-full border p-2.5 rounded-lg outline-none focus:border-blue-500" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input name="email" defaultValue={settings.email} className="w-full border p-2.5 rounded-lg outline-none focus:border-blue-500" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                        <textarea name="address" rows={2} defaultValue={settings.address} className="w-full border p-2.5 rounded-lg resize-none outline-none focus:border-blue-500" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Footer Message</label>
+                        <input name="footer" defaultValue={settings.receipt_footer} className="w-full border p-2.5 rounded-lg outline-none focus:border-blue-500" />
+                    </div>
+                    
+                    <button type="submit" className="w-full bg-gray-800 hover:bg-gray-900 text-white py-3 rounded-lg font-bold flex justify-center items-center gap-2">
+                        <Save className="w-4 h-4" /> Save Settings
+                    </button>
+                </form>
+            </div>
+        </div>
+      )}
 
       {/* MODAL: Record New Sale */}
       {isModalOpen && (
