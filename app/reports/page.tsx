@@ -48,17 +48,18 @@ export default function Reports() {
   async function generatePDF() {
     if (!data) return;
     const doc = new jsPDF();
+
     doc.setFillColor(34, 197, 94);
-    doc.rect(0, 0, 210, 40, 'F');
+    doc.rect(0, 0, 210, 45, 'F');
     
     if (logoBase64) {
       const svgString = atob(logoBase64.split(',')[1]);
-      await addSvgToPdf(doc, svgString, 15, 5, 30, 30);
+      await addSvgToPdf(doc, svgString, 15, 7, 30, 30);
     }
     
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
-    doc.text(`${reportType.toUpperCase()} REPORT`, 105, 25, { align: "center" });
+    doc.text(`${reportType.toUpperCase()} REPORT`, 105, 28, { align: "center" });
     
     const kpiRows = Object.entries(data.kpi).map(([key, val]: any) => [key.replace(/_/g, ' ').toUpperCase(), val]);
     autoTable(doc, { startY: 65, head: [['Metric', 'Value']], body: kpiRows });

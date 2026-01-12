@@ -65,17 +65,16 @@ export default function LivestockManagement() {
     const doc = new jsPDF();
 
     doc.setFillColor(34, 197, 94);
-    doc.rect(0, 0, 210, 40, 'F');
+    doc.rect(0, 0, 210, 45, 'F'); // Increased height
     
-    // Use the async SVG helper
     if (logoBase64) {
       const svgString = atob(logoBase64.split(',')[1]);
-      await addSvgToPdf(doc, svgString, 15, 5, 30, 30);
+      await addSvgToPdf(doc, svgString, 15, 7, 30, 30); // Repositioned and resized
     }
 
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
-    doc.text("ANIMAL HEALTH BOOKLET", 105, 25, { align: "center" });
+    doc.text("ANIMAL HEALTH BOOKLET", 105, 28, { align: "center" });
     
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(12);

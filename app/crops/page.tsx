@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Sprout, MapPin, Calendar, BarChart3, Plus, X, Droplets, Pencil, Scissors, DollarSign, CheckCircle } from 'lucide-react';
+import { Sprout, MapPin, Calendar, BarChart3, Plus, X, Droplets, Pencil, Scissors, DollarSign } from 'lucide-react';
 
 export default function CropManagement() {
   const [crops, setCrops] = useState<any[]>([]);
@@ -16,13 +16,12 @@ export default function CropManagement() {
   // Editing State
   const [editingCrop, setEditingCrop] = useState<any>(null);
 
-  // Notification State
-  const [toast, setToast] = useState({ show: false, message: '' });
-
+  // Load Crops
   useEffect(() => {
     fetchCrops();
   }, []);
 
+  // Load Treatments when a crop is selected
   useEffect(() => {
     if (selectedCrop) {
       fetchTreatments(selectedCrop.id);
@@ -45,6 +44,7 @@ export default function CropManagement() {
     } catch (e) { console.error(e); }
   }
 
+  // --- LOGIC: Calculate Status Automatically ---
   function getCropStatus(plantingDate: string, harvestDate: string, actualYield: any) {
     if (actualYield && Number(actualYield) > 0) return 'harvested';
     if (!plantingDate) return 'unknown';
@@ -65,12 +65,7 @@ export default function CropManagement() {
     return 'growing';
   }
 
-  function showNotification(message: string) {
-    setToast({ show: true, message });
-    setTimeout(() => {
-        setToast({ show: false, message: '' });
-    }, 3000);
-  }
+  // --- HANDLERS ---
 
   function openAddCrop() {
     setEditingCrop(null);
@@ -112,7 +107,6 @@ export default function CropManagement() {
     if (res.ok) {
         fetchCrops();
         setIsCropModalOpen(false);
-        showNotification(editingCrop ? 'Crop updated successfully' : 'Crop added successfully');
         if (editingCrop && selectedCrop && editingCrop.id === selectedCrop.id) {
             setSelectedCrop({ ...selectedCrop, ...formData });
         }
@@ -142,7 +136,6 @@ export default function CropManagement() {
     if (res.ok) {
         fetchTreatments(selectedCrop.id);
         setIsTreatmentModalOpen(false);
-        showNotification('Treatment recorded successfully');
     }
   }
 
@@ -170,26 +163,12 @@ export default function CropManagement() {
         fetchCrops();
         setSelectedCrop(body);
         setIsYieldModalOpen(false);
-        showNotification('Yield updated successfully');
     }
   }
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto min-h-screen relative">
+    <div className="p-8 max-w-[1600px] mx-auto min-h-screen">
       
-      {/* SUCCESS TOAST */}
-      {toast.show && (
-        <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 animate-bounce z-50">
-            <div className="bg-green-500 rounded-full p-1">
-                <CheckCircle className="w-4 h-4 text-white" />
-            </div>
-            <div>
-                <h4 className="font-bold text-sm">Success</h4>
-                <p className="text-xs text-gray-300">{toast.message}</p>
-            </div>
-        </div>
-      )}
-
       {/* Header Row */}
       <div className="flex justify-between items-center mb-6">
         <div>
@@ -250,7 +229,7 @@ export default function CropManagement() {
         </div>
 
         {/* RIGHT COLUMN: Details Panel */}
-        {selectedCrop && (
+        {selectedCrop ? (
           <div className="w-full md:w-96 bg-white rounded-xl shadow-lg border border-gray-200 p-6 sticky top-0 animate-in slide-in-from-right-4 duration-300 self-start">
             <div className="mb-6 pb-6 border-b border-gray-100 flex justify-between items-start">
               <div>
@@ -315,6 +294,11 @@ export default function CropManagement() {
               </div>
             </div>
           </div>
+        ) : (
+            <div className="hidden md:flex w-96 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 p-10 flex-col items-center justify-center text-gray-400 h-64 sticky top-0">
+                <Sprout className="w-12 h-12 mb-2 opacity-20" />
+                <p>Select a crop to view details</p>
+            </div>
         )}
       </div>
 
