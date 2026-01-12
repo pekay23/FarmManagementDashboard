@@ -4,10 +4,12 @@ import sql from '@/lib/db';
 // DELETE ITEM
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await props.params; // Await the params first
     const id = params.id;
+    
     await sql`DELETE FROM inventory WHERE id = ${id}`;
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -18,10 +20,12 @@ export async function DELETE(
 // UPDATE ITEM
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await props.params; // Await the params first
     const id = params.id;
+    
     const body = await request.json();
     const { name, category, quantity, unit, threshold, price, supplier } = body;
 
