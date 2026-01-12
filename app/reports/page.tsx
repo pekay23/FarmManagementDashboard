@@ -31,8 +31,25 @@ export default function Reports() {
       const res = await fetch(`/api/reports?type=${reportType}&period=${period}`);
       const json = await res.json();
       setData(json);
-    } catch (e) { console.error(e); } finally { setLoading(false); }
+    } catch (e) { 
+      console.error(e); 
+    } finally { 
+      setLoading(false); 
+    }
   }
+
+  // --- HANDLERS TO PREVENT CRASHES ---
+  const handleTypeChange = (e: any) => {
+      setReportType(e.target.value);
+      setData(null); // Clear data immediately to prevent type mismatch
+      setLoading(true);
+  };
+
+  const handlePeriodChange = (e: any) => {
+      setPeriod(e.target.value);
+      setData(null); // Clear data immediately
+      setLoading(true);
+  };
 
   function showNotification(message: string) {
     setToast({ show: true, message });
@@ -58,6 +75,7 @@ export default function Reports() {
   // --- DYNAMIC CONTENT RENDERERS ---
 
   const renderKPIs = () => {
+    // Safety Check: If data doesn't match the requested type, don't render yet
     if (!data?.kpi) return null;
 
     switch (reportType) {
@@ -66,47 +84,48 @@ export default function Reports() {
                 <>
                     <KpiCard title="Total Crops" value={data.kpi.crops} sub="+12% from last period" icon={Sprout} color="green" />
                     <KpiCard title="Total Animals" value={data.kpi.animals} sub="+8% from last period" icon={PawPrint} color="blue" />
-                    <KpiCard title="Total Sales" value={`GH₵ ${data.kpi.sales.toLocaleString()}`} sub="+23% from last period" icon={DollarSign} color="purple" />
-                    <KpiCard title="Task Completion" value={`${data.kpi.completion_rate}%`} sub="+5% from last period" icon={TrendingUp} color="orange" />
+                    <KpiCard title="Total Sales" value={`GH₵ ${(data.kpi.sales || 0).toLocaleString()}`} sub="+23% from last period" icon={DollarSign} color="purple" />
+                    <KpiCard title="Task Completion" value={`${data.kpi.completion_rate || 0}%`} sub="+5% from last period" icon={TrendingUp} color="orange" />
                 </>
             );
         case 'sales':
+            // Use fallback (|| 0) to safely handle loading states
             return (
                 <>
-                    <KpiCard title="Total Revenue" value={`GH₵ ${data.kpi.total_revenue.toLocaleString()}`} icon={DollarSign} color="purple" />
-                    <KpiCard title="Transactions" value={data.kpi.total_transactions} icon={FileDown} color="blue" />
-                    <KpiCard title="Avg. Ticket" value={`GH₵ ${Math.round(data.kpi.avg_ticket).toLocaleString()}`} icon={TrendingUp} color="green" />
+                    <KpiCard title="Total Revenue" value={`GH₵ ${(data.kpi.total_revenue || 0).toLocaleString()}`} icon={DollarSign} color="purple" />
+                    <KpiCard title="Transactions" value={data.kpi.total_transactions || 0} icon={FileDown} color="blue" />
+                    <KpiCard title="Avg. Ticket" value={`GH₵ ${Math.round(data.kpi.avg_ticket || 0).toLocaleString()}`} icon={TrendingUp} color="green" />
                 </>
             );
         case 'inventory':
             return (
                 <>
-                    <KpiCard title="Inventory Valuation" value={`GH₵ ${data.kpi.valuation.toLocaleString()}`} icon={DollarSign} color="green" />
-                    <KpiCard title="Low Stock Items" value={data.kpi.low_stock} sub="Restock needed" icon={AlertTriangle} color="red" />
-                    <KpiCard title="Total Items" value={data.kpi.total_items} icon={Package} color="blue" />
+                    <KpiCard title="Inventory Valuation" value={`GH₵ ${(data.kpi.valuation || 0).toLocaleString()}`} icon={DollarSign} color="green" />
+                    <KpiCard title="Low Stock Items" value={data.kpi.low_stock || 0} sub="Restock needed" icon={AlertTriangle} color="red" />
+                    <KpiCard title="Total Items" value={data.kpi.total_items || 0} icon={Package} color="blue" />
                 </>
             );
         case 'tasks':
             return (
                 <>
-                    <KpiCard title="Total Tasks" value={data.kpi.total} icon={Layers} color="blue" />
-                    <KpiCard title="Completed" value={data.kpi.completed} icon={CheckCircle} color="green" />
-                    <KpiCard title="Overdue" value={data.kpi.overdue} sub="Urgent" icon={AlertCircle} color="red" />
-                    <KpiCard title="Pending" value={data.kpi.pending} icon={Clock} color="orange" />
+                    <KpiCard title="Total Tasks" value={data.kpi.total || 0} icon={Layers} color="blue" />
+                    <KpiCard title="Completed" value={data.kpi.completed || 0} icon={CheckCircle} color="green" />
+                    <KpiCard title="Overdue" value={data.kpi.overdue || 0} sub="Urgent" icon={AlertCircle} color="red" />
+                    <KpiCard title="Pending" value={data.kpi.pending || 0} icon={Clock} color="orange" />
                 </>
             );
         case 'crops':
             return (
                 <>
-                    <KpiCard title="Total Planted" value={data.kpi.total} icon={Sprout} color="green" />
-                    <KpiCard title="Harvested" value={data.kpi.harvested} icon={CheckCircle} color="orange" />
-                    <KpiCard title="Active Fields" value={data.kpi.planted} icon={Layers} color="blue" />
+                    <KpiCard title="Total Planted" value={data.kpi.total || 0} icon={Sprout} color="green" />
+                    <KpiCard title="Harvested" value={data.kpi.harvested || 0} icon={CheckCircle} color="orange" />
+                    <KpiCard title="Active Fields" value={data.kpi.planted || 0} icon={Layers} color="blue" />
                 </>
             );
         case 'livestock':
             return (
                 <>
-                    <KpiCard title="Total Animals" value={data.kpi.total} icon={PawPrint} color="orange" />
+                    <KpiCard title="Total Animals" value={data.kpi.total || 0} icon={PawPrint} color="orange" />
                 </>
             );
         default:
@@ -250,7 +269,11 @@ export default function Reports() {
         
         <div className="flex gap-3">
             <div className="relative">
-                <select className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-green-500 shadow-sm" value={period} onChange={(e) => setPeriod(e.target.value)}>
+                <select 
+                    className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-green-500 shadow-sm"
+                    value={period}
+                    onChange={handlePeriodChange} // Updated Handler
+                >
                     <option value="month">This Month</option>
                     <option value="year">This Year</option>
                     <option value="all">All Time</option>
@@ -259,7 +282,11 @@ export default function Reports() {
             </div>
 
             <div className="relative">
-                <select className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-green-500 font-bold shadow-sm" value={reportType} onChange={(e) => setReportType(e.target.value)}>
+                <select 
+                    className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-green-500 font-bold shadow-sm"
+                    value={reportType}
+                    onChange={handleTypeChange} // Updated Handler
+                >
                     <option value="overview">Overview Report</option>
                     <option value="sales">Sales Report</option>
                     <option value="inventory">Inventory Report</option>
@@ -276,7 +303,7 @@ export default function Reports() {
         </div>
       </div>
 
-      {loading ? <div className="text-center py-20 text-gray-400">Loading data...</div> : (
+      {loading || !data ? <div className="text-center py-20 text-gray-400">Loading data...</div> : (
         <>
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
