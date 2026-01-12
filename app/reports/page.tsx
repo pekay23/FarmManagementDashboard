@@ -38,18 +38,8 @@ export default function Reports() {
     }
   }
 
-  // --- HANDLERS TO PREVENT CRASHES ---
-  const handleTypeChange = (e: any) => {
-      setReportType(e.target.value);
-      setData(null);
-      setLoading(true);
-  };
-
-  const handlePeriodChange = (e: any) => {
-      setPeriod(e.target.value);
-      setData(null);
-      setLoading(true);
-  };
+  const handleTypeChange = (e: any) => { setReportType(e.target.value); setData(null); setLoading(true); };
+  const handlePeriodChange = (e: any) => { setPeriod(e.target.value); setData(null); setLoading(true); };
 
   function showNotification(message: string) {
     setToast({ show: true, message });
@@ -123,7 +113,7 @@ export default function Reports() {
         case 'livestock':
             return (
                 <>
-                    <KpiCard title="Total Records" value={data.kpi.total || 0} icon={Layers} color="blue" />
+                    <KpiCard title="Total Animals" value={data.kpi.total || 0} icon={Layers} color="blue" />
                     <KpiCard title="Active Animals" value={data.kpi.active || 0} icon={PawPrint} color="green" />
                     <KpiCard title="Sick / Injured" value={data.kpi.sick || 0} sub="Requires Attention" icon={HeartPulse} color="red" />
                     <KpiCard title="Sold / Gone" value={data.kpi.sold || 0} icon={DollarSign} color="orange" />
@@ -169,27 +159,41 @@ export default function Reports() {
             );
         case 'sales':
             return (
-                <div className="lg:col-span-2">
-                    <ChartCard title="Revenue Trend Analysis">
-                        <AreaChart data={data.charts.salesTrend}>
-                            <defs>
-                                <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
-                                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Area type="monotone" dataKey="value" name="Revenue" stroke="#22c55e" fill="url(#colorRev)" />
-                        </AreaChart>
-                    </ChartCard>
-                </div>
+                <>
+                    <div className="lg:col-span-2">
+                        <ChartCard title="Revenue Trend Analysis">
+                            <AreaChart data={data.charts.salesTrend}>
+                                <defs>
+                                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
+                                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" />
+                                <YAxis />
+                                <Tooltip />
+                                <Area type="monotone" dataKey="value" name="Revenue" stroke="#22c55e" fill="url(#colorRev)" />
+                            </AreaChart>
+                        </ChartCard>
+                    </div>
+                    {/* NEW: Top Selling Items */}
+                    <div className="lg:col-span-2">
+                        <ChartCard title="Top Selling Products">
+                            <BarChart data={data.charts.topItems} layout="vertical">
+                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                                <XAxis type="number" />
+                                <YAxis dataKey="name" type="category" width={100} />
+                                <Tooltip cursor={{fill: 'transparent'}} />
+                                <Bar dataKey="value" name="Revenue" fill="#8b5cf6" barSize={25} radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                        </ChartCard>
+                    </div>
+                </>
             );
         case 'inventory':
             return (
-                <div className="lg:col-span-2">
+                <>
                     <ChartCard title="Top Stock Levels">
                         <BarChart data={data.charts.stockLevels} layout="vertical" margin={{ left: 20 }}>
                             <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
@@ -199,12 +203,22 @@ export default function Reports() {
                             <Bar dataKey="value" name="Quantity" fill="#3b82f6" barSize={20} radius={[0, 4, 4, 0]} />
                         </BarChart>
                     </ChartCard>
-                </div>
+                    {/* NEW: Value by Category */}
+                    <ChartCard title="Value by Category">
+                        <PieChart>
+                            <Pie data={data.charts.categoryValue} cx="50%" cy="50%" innerRadius={60} outerRadius={100} fill="#8884d8" dataKey="value">
+                                {data.charts.categoryValue?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip />
+                            <Legend />
+                        </PieChart>
+                    </ChartCard>
+                </>
             );
         case 'tasks':
             return (
-                <div className="lg:col-span-2">
-                    <ChartCard title="Employee Performance (Completed Tasks)">
+                <>
+                    <ChartCard title="Employee Performance (Completed)">
                         <BarChart data={data.charts.empPerformance}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis dataKey="name" />
@@ -213,11 +227,23 @@ export default function Reports() {
                             <Bar dataKey="value" name="Tasks" fill="#f97316" barSize={40} radius={[4, 4, 0, 0]} />
                         </BarChart>
                     </ChartCard>
-                </div>
+                    {/* NEW: Priority Distribution */}
+                    <ChartCard title="Pending Tasks by Priority">
+                        <PieChart>
+                            <Pie data={data.charts.priorityDist} cx="50%" cy="50%" outerRadius={100} fill="#8884d8" dataKey="value" label>
+                                {data.charts.priorityDist?.map((entry: any, index: number) => (
+                                    <Cell key={`cell-${index}`} fill={entry.name === 'high' ? '#ef4444' : entry.name === 'medium' ? '#eab308' : '#3b82f6'} />
+                                ))}
+                            </Pie>
+                            <Tooltip />
+                            <Legend />
+                        </PieChart>
+                    </ChartCard>
+                </>
             );
         case 'crops':
             return (
-                <div className="lg:col-span-2">
+                <>
                     <ChartCard title="Yield Estimates vs Actuals">
                         <BarChart data={data.charts.yieldComparison}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -229,7 +255,17 @@ export default function Reports() {
                             <Bar dataKey="actual" name="Act. Yield (kg)" fill="#22c55e" radius={[4, 4, 0, 0]} />
                         </BarChart>
                     </ChartCard>
-                </div>
+                    {/* NEW: Land Usage */}
+                    <ChartCard title="Land Usage (Acres)">
+                        <PieChart>
+                            <Pie data={data.charts.landUsage} cx="50%" cy="50%" outerRadius={100} fill="#8884d8" dataKey="value" label>
+                                {data.charts.landUsage?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip />
+                            <Legend />
+                        </PieChart>
+                    </ChartCard>
+                </>
             );
         case 'livestock':
             return (
@@ -243,7 +279,7 @@ export default function Reports() {
                             <Legend />
                         </PieChart>
                     </ChartCard>
-                    <ChartCard title="Health Status Breakdown">
+                    <ChartCard title="Health Status">
                         <BarChart data={data.charts.healthDist}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis dataKey="name" />
@@ -256,6 +292,18 @@ export default function Reports() {
                             </Bar>
                         </BarChart>
                     </ChartCard>
+                    {/* NEW: Gender Distribution */}
+                    <div className="lg:col-span-2">
+                        <ChartCard title="Gender Distribution">
+                            <BarChart data={data.charts.genderDist} layout="vertical" margin={{ left: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                                <XAxis type="number" />
+                                <YAxis dataKey="name" type="category" width={80} />
+                                <Tooltip cursor={{fill: 'transparent'}} />
+                                <Bar dataKey="value" name="Count" fill="#3b82f6" barSize={30} radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                        </ChartCard>
+                    </div>
                 </>
             );
         default:
@@ -283,11 +331,7 @@ export default function Reports() {
         
         <div className="flex gap-3">
             <div className="relative">
-                <select 
-                    className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-green-500 shadow-sm"
-                    value={period}
-                    onChange={handlePeriodChange}
-                >
+                <select className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-green-500 shadow-sm" value={period} onChange={handlePeriodChange}>
                     <option value="month">This Month</option>
                     <option value="year">This Year</option>
                     <option value="all">All Time</option>
@@ -296,11 +340,7 @@ export default function Reports() {
             </div>
 
             <div className="relative">
-                <select 
-                    className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-green-500 font-bold shadow-sm"
-                    value={reportType}
-                    onChange={handleTypeChange}
-                >
+                <select className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-green-500 font-bold shadow-sm" value={reportType} onChange={handleTypeChange}>
                     <option value="overview">Overview Report</option>
                     <option value="sales">Sales Report</option>
                     <option value="inventory">Inventory Report</option>

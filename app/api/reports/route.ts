@@ -25,13 +25,10 @@ export async function GET(request: Request) {
             : 0;
 
         const cropDist = await sql`SELECT crop_type as name, COUNT(*) as value FROM crops GROUP BY crop_type`;
-        
         const salesTrend = await sql`
             SELECT TO_CHAR(sale_date, 'Mon DD') as name, SUM(total_amount) as value 
-            FROM sales 
-            WHERE sale_date >= NOW() - ${interval}::INTERVAL
-            GROUP BY TO_CHAR(sale_date, 'Mon DD'), sale_date 
-            ORDER BY sale_date DESC LIMIT 7
+            FROM sales WHERE sale_date >= NOW() - ${interval}::INTERVAL
+            GROUP BY TO_CHAR(sale_date, 'Mon DD'), sale_date ORDER BY sale_date DESC LIMIT 7
         `;
 
         result.kpi = { 
@@ -43,7 +40,7 @@ export async function GET(request: Request) {
         result.charts = { cropDist, salesTrend };
     }
 
-    // --- 2. SALES REPORT ---
+    // --- 2. SALES REPORT (Enhanced) ---
     else if (type === 'sales') {
         const salesTotal = await sql`SELECT SUM(total_amount) FROM sales WHERE sale_date >= NOW() - ${interval}::INTERVAL`;
         const salesCount = await sql`SELECT COUNT(*) FROM sales WHERE sale_date >= NOW() - ${interval}::INTERVAL`;
@@ -51,10 +48,18 @@ export async function GET(request: Request) {
         
         const salesTrend = await sql`
             SELECT TO_CHAR(sale_date, 'Mon DD') as name, SUM(total_amount) as value 
-            FROM sales 
-            WHERE sale_date >= NOW() - ${interval}::INTERVAL
-            GROUP BY TO_CHAR(sale_date, 'Mon DD'), sale_date 
-            ORDER BY sale_date 
+            FROM sales WHERE sale_date >= NOW() - ${interval}::INTERVAL
+            GROUP BY TO_CHAR(sale_date, 'Mon DD'), sale_date ORDER BY sale_date
+        `;
+
+        // NEW: Top Selling Items by Revenue
+        const topItems = await sql`
+            SELECT item_name as name, SUM(quantity * price_at_sale) as value
+            FROM sale_items si
+            JOIN sales s ON si.sale_id = s.id
+            WHERE s.sale_date >= NOW() - ${interval}::INTERVAL
+            GROUP BY item_name
+            ORDER BY value DESC LIMIT 5
         `;
 
         result.kpi = { 
@@ -62,30 +67,39 @@ export async function GET(request: Request) {
             total_transactions: Number(salesCount[0].count), 
             avg_ticket: Number(avgSale[0].avg || 0) 
         };
-        result.charts = { salesTrend };
+        result.charts = { salesTrend, topItems };
     }
 
-    // --- 3. INVENTORY REPORT ---
+    // --- 3. INVENTORY REPORT (Enhanced) ---
     else if (type === 'inventory') {
         const totalItems = await sql`SELECT COUNT(*) FROM inventory`;
         const lowStock = await sql`SELECT COUNT(*) FROM inventory WHERE quantity <= min_threshold`;
         const totalValue = await sql`SELECT SUM(quantity * unit_price) FROM inventory`;
+
         const stockLevels = await sql`SELECT item_name as name, quantity as value FROM inventory ORDER BY quantity DESC LIMIT 10`;
+        
+        // NEW: Value by Category (Where is the money tied up?)
+        const categoryValue = await sql`
+            SELECT category as name, SUM(quantity * unit_price) as value 
+            FROM inventory GROUP BY category
+        `;
 
         result.kpi = {
             total_items: Number(totalItems[0].count),
             low_stock: Number(lowStock[0].count),
             valuation: Number(totalValue[0].sum || 0)
         };
-        result.charts = { stockLevels };
+        result.charts = { stockLevels, categoryValue };
     }
 
-    // --- 4. TASKS REPORT ---
+    // --- 4. TASKS REPORT (Fixed Query) ---
     else if (type === 'tasks') {
         const totalTasks = await sql`SELECT COUNT(*) FROM tasks`;
         const completed = await sql`SELECT COUNT(*) FROM tasks WHERE status = 'completed'`;
         const overdue = await sql`SELECT COUNT(*) FROM tasks WHERE status != 'completed' AND due_date < CURRENT_DATE`;
-        
+        const pending = Number(totalTasks[0].count) - Number(completed[0].count);
+
+        // Fixed: Correctly joins task_assignments to count completed tasks per employee
         const empPerformance = await sql`
             SELECT e.full_name as name, COUNT(ta.task_id) as value 
             FROM employees e 
@@ -95,16 +109,22 @@ export async function GET(request: Request) {
             GROUP BY e.full_name
         `;
 
+        const priorityDist = await sql`
+            SELECT priority as name, COUNT(*) as value 
+            FROM tasks WHERE status = 'pending' 
+            GROUP BY priority
+        `;
+
         result.kpi = {
             total: Number(totalTasks[0].count),
             completed: Number(completed[0].count),
             overdue: Number(overdue[0].count),
-            pending: Number(totalTasks[0].count) - Number(completed[0].count)
+            pending
         };
-        result.charts = { empPerformance };
+        result.charts = { empPerformance, priorityDist };
     }
 
-    // --- 5. CROP REPORT ---
+    // --- 5. CROP REPORT (Enhanced) ---
     else if (type === 'crops') {
         const totalCrops = await sql`SELECT COUNT(*) FROM crops`;
         const harvested = await sql`SELECT COUNT(*) FROM crops WHERE status = 'harvested'`;
@@ -115,15 +135,21 @@ export async function GET(request: Request) {
             FROM crops GROUP BY crop_type
         `;
 
+        // NEW: Land Usage (Which crop takes the most space?)
+        const landUsage = await sql`
+            SELECT crop_type as name, SUM(plot_size_acres) as value 
+            FROM crops GROUP BY crop_type
+        `;
+
         result.kpi = { 
             total: Number(totalCrops[0].count), 
             harvested: Number(harvested[0].count), 
             planted: Number(planted[0].count) 
         };
-        result.charts = { yieldComparison };
+        result.charts = { yieldComparison, landUsage };
     }
 
-    // --- 6. LIVESTOCK REPORT (UPDATED) ---
+    // --- 6. LIVESTOCK REPORT (Enhanced) ---
     else if (type === 'livestock') {
         const total = await sql`SELECT COUNT(*) FROM livestock`;
         const sick = await sql`SELECT COUNT(*) FROM livestock WHERE health_status = 'Sick'`;
@@ -132,13 +158,16 @@ export async function GET(request: Request) {
         const speciesDist = await sql`SELECT species as name, COUNT(*) as value FROM livestock GROUP BY species`;
         const healthDist = await sql`SELECT health_status as name, COUNT(*) as value FROM livestock GROUP BY health_status`;
         
+        // NEW: Gender Distribution (Breeding Planning)
+        const genderDist = await sql`SELECT sex as name, COUNT(*) as value FROM livestock GROUP BY sex`;
+
         result.kpi = { 
             total: Number(total[0].count),
             sick: Number(sick[0].count),
             sold: Number(sold[0].count),
             active: Number(total[0].count) - Number(sold[0].count)
         };
-        result.charts = { speciesDist, healthDist };
+        result.charts = { speciesDist, healthDist, genderDist };
     }
 
     return NextResponse.json(result);

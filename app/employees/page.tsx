@@ -11,6 +11,9 @@ export default function EmployeeTaskManagement() {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [toast, setToast] = useState({ show: false, message: '' });
 
+  // Custom State for Checkbox Multi-Select
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
+
   // New State for Confirmation Modal
   const [confirmDelete, setConfirmDelete] = useState<{ show: boolean, type: string, id: string | null }>({ show: false, type: '', id: null });
 
@@ -31,6 +34,21 @@ export default function EmployeeTaskManagement() {
   function showNotification(message: string) {
     setToast({ show: true, message });
     setTimeout(() => setToast({ show: false, message: '' }), 3000);
+  }
+
+  function openTaskModal(task?: any) {
+      setEditingItem(task || null);
+      // Pre-fill selected assignees if editing, else empty
+      setSelectedAssignees(task?.assignee_ids || []); // NOTE: Ensure API returns assignee_ids array or handle parsing
+      setActiveModal('task');
+  }
+
+  function toggleAssignee(empId: string) {
+      if (selectedAssignees.includes(empId)) {
+          setSelectedAssignees(selectedAssignees.filter(id => id !== empId));
+      } else {
+          setSelectedAssignees([...selectedAssignees, empId]);
+      }
   }
 
   // --- ACTIONS ---
@@ -58,12 +76,11 @@ export default function EmployeeTaskManagement() {
 
   async function handleSaveTask(e: any) {
     e.preventDefault();
-    const assigned_to_ids = Array.from(e.target.assigned_to.selectedOptions).map((option: any) => option.value);
     
     const body = {
         title: e.target.title.value,
         description: e.target.description.value,
-        assigned_to_ids,
+        assigned_to_ids: selectedAssignees, // Use state instead of form data
         due_date: e.target.due_date.value,
         priority: e.target.priority.value,
         category: e.target.category.value
@@ -81,26 +98,19 @@ export default function EmployeeTaskManagement() {
     }
   }
 
-  // Updated Delete Logic
   function openDeleteConfirmation(type: 'employee' | 'task', id: string) {
     setConfirmDelete({ show: true, type, id });
   }
 
   async function executeDelete() {
     if (!confirmDelete.id) return;
-    
     const { type, id } = confirmDelete;
-
-    const res = await fetch(`/api/${type}s`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
-    });
+    const res = await fetch(`/api/${type}s`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
     if (res.ok) {
         fetchData();
         showNotification(`${type.charAt(0).toUpperCase() + type.slice(1)} deleted`);
     }
-    setConfirmDelete({ show: false, type: '', id: null }); // Close modal
+    setConfirmDelete({ show: false, type: '', id: null });
   }
 
   async function toggleTaskStatus(task: any) {
@@ -126,20 +136,18 @@ export default function EmployeeTaskManagement() {
         </div>
       )}
 
-      {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Employee & Task Management</h1>
         <div className="flex gap-3">
             <button onClick={() => { setEditingItem(null); setActiveModal('employee'); }} className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium">
                 <Plus className="w-5 h-5" /> Add Employee
             </button>
-            <button onClick={() => { setEditingItem(null); setActiveModal('task'); }} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium">
+            <button onClick={() => openTaskModal()} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium">
                 <Plus className="w-5 h-5" /> Add Task
             </button>
         </div>
       </div>
 
-      {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <KpiCard title="Total Employees" value={employees.length} icon={Users} color="blue" />
         <KpiCard title="Active Tasks" value={activeTaskCount} icon={Clock} color="yellow" />
@@ -147,9 +155,7 @@ export default function EmployeeTaskManagement() {
         <KpiCard title="Completed" value={completedCount} icon={CheckCircle} color="green" />
       </div>
 
-      {/* Content */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Employees */}
         <div>
             <h3 className="font-bold text-gray-800 text-lg mb-4">Employees</h3>
             <div className="space-y-4">
@@ -173,7 +179,6 @@ export default function EmployeeTaskManagement() {
             </div>
         </div>
 
-        {/* Tasks */}
         <div>
             <h3 className="font-bold text-gray-800 text-lg mb-4">Recent Tasks</h3>
             <div className="space-y-4">
@@ -185,7 +190,7 @@ export default function EmployeeTaskManagement() {
                         <div className="flex justify-between items-start mb-2">
                             <h4 className={`font-bold ${isCompleted ? 'text-gray-500 line-through' : 'text-gray-900'}`}>{task.title}</h4>
                             <div className="flex gap-1">
-                                <button onClick={() => { setEditingItem(task); setActiveModal('task'); }} className="p-1 text-gray-400 hover:text-blue-600 rounded-full"><Pencil className="w-3 h-3"/></button>
+                                <button onClick={() => openTaskModal(task)} className="p-1 text-gray-400 hover:text-blue-600 rounded-full"><Pencil className="w-3 h-3"/></button>
                                 <button onClick={() => openDeleteConfirmation('task', task.id)} className="p-1 text-gray-400 hover:text-red-600 rounded-full"><Trash2 className="w-3 h-3"/></button>
                             </div>
                         </div>
@@ -209,15 +214,27 @@ export default function EmployeeTaskManagement() {
       {activeModal === 'employee' && (
         <Modal title={editingItem ? "Update Employee" : "Add Employee"} onClose={() => {setActiveModal(null); setEditingItem(null);}}>
             <form onSubmit={handleSaveEmployee} className="space-y-4">
-                <input name="full_name" required defaultValue={editingItem?.full_name} className="w-full border p-3 rounded-lg" />
-                <input name="role" required defaultValue={editingItem?.role} className="w-full border p-3 rounded-lg" />
-                <input name="contact" required defaultValue={editingItem?.contact_info} className="w-full border p-3 rounded-lg" />
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                    <input name="full_name" required defaultValue={editingItem?.full_name} className="w-full border p-3 rounded-lg outline-none focus:border-green-500" placeholder="e.g. John Doe" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Role / Position</label>
+                    <input name="role" required defaultValue={editingItem?.role} className="w-full border p-3 rounded-lg outline-none focus:border-green-500" placeholder="e.g. Farm Manager" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Contact Info</label>
+                    <input name="contact" required defaultValue={editingItem?.contact_info} className="w-full border p-3 rounded-lg outline-none focus:border-green-500" placeholder="Phone or Email" />
+                </div>
                 {editingItem && (
-                    <select name="status" defaultValue={editingItem?.status} className="w-full border p-3 rounded-lg bg-white">
-                        <option value="Active">Active</option>
-                        <option value="On Leave">On Leave</option>
-                        <option value="Terminated">Terminated</option>
-                    </select>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                        <select name="status" defaultValue={editingItem?.status} className="w-full border p-3 rounded-lg bg-white outline-none focus:border-green-500">
+                            <option value="Active">Active</option>
+                            <option value="On Leave">On Leave</option>
+                            <option value="Terminated">Terminated</option>
+                        </select>
+                    </div>
                 )}
                 <button className="w-full bg-green-600 text-white py-3 rounded-lg font-bold">
                     {editingItem ? "Update Employee" : "Save Employee"}
@@ -229,20 +246,59 @@ export default function EmployeeTaskManagement() {
       {activeModal === 'task' && (
         <Modal title={editingItem ? "Update Task" : "Add Task"} onClose={() => {setActiveModal(null); setEditingItem(null);}}>
             <form onSubmit={handleSaveTask} className="space-y-4">
-                <input name="title" required defaultValue={editingItem?.title} className="w-full border p-3 rounded-lg" />
-                <textarea name="description" rows={3} defaultValue={editingItem?.description} className="w-full border p-3 rounded-lg resize-none" />
-                <select name="assigned_to" multiple className="w-full border p-3 rounded-lg bg-white h-32">
-                    {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
-                </select>
-                <div className="grid grid-cols-2 gap-4">
-                    <input name="due_date" type="date" required defaultValue={editingItem ? new Date(editingItem.due_date).toISOString().split('T')[0] : ''} className="w-full border p-3 rounded-lg text-gray-500" />
-                    <select name="priority" defaultValue={editingItem?.priority || 'medium'} className="w-full border p-3 rounded-lg bg-white">
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                        <option value="low">Low</option>
-                    </select>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Task Title</label>
+                    <input name="title" required defaultValue={editingItem?.title} className="w-full border p-3 rounded-lg outline-none focus:border-green-500" placeholder="e.g. Fix Irrigation" />
                 </div>
-                <input name="category" defaultValue={editingItem?.category} className="w-full border p-3 rounded-lg" />
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea name="description" rows={3} defaultValue={editingItem?.description} className="w-full border p-3 rounded-lg resize-none outline-none focus:border-green-500" placeholder="Details about the task..." />
+                </div>
+                
+                {/* CHECKBOX MULTI-SELECT */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Assign to Employee(s)</label>
+                    <div className="border p-3 rounded-lg bg-white max-h-40 overflow-y-auto">
+                        {employees.length === 0 ? (
+                            <p className="text-xs text-gray-400">No employees found. Add one first.</p>
+                        ) : (
+                            employees.map(emp => (
+                                <div key={emp.id} className="flex items-center gap-2 mb-2 last:mb-0">
+                                    <input 
+                                        type="checkbox" 
+                                        id={`emp-${emp.id}`} 
+                                        value={emp.id}
+                                        checked={selectedAssignees.includes(emp.id)}
+                                        onChange={() => toggleAssignee(emp.id)}
+                                        className="w-4 h-4 text-green-600 rounded focus:ring-green-500 cursor-pointer"
+                                    />
+                                    <label htmlFor={`emp-${emp.id}`} className="text-sm text-gray-700 cursor-pointer select-none">
+                                        {emp.full_name} <span className="text-gray-400 text-xs">({emp.role})</span>
+                                    </label>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                        <input name="due_date" type="date" required defaultValue={editingItem ? new Date(editingItem.due_date).toISOString().split('T')[0] : ''} className="w-full border p-3 rounded-lg text-gray-500 outline-none focus:border-green-500" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                        <select name="priority" defaultValue={editingItem?.priority || 'medium'} className="w-full border p-3 rounded-lg bg-white outline-none focus:border-green-500">
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <input name="category" defaultValue={editingItem?.category} className="w-full border p-3 rounded-lg outline-none focus:border-green-500" placeholder="e.g. Maintenance" />
+                </div>
                 <button className="w-full bg-green-600 text-white py-3 rounded-lg font-bold">
                     {editingItem ? "Update Task" : "Save Task"}
                 </button>
