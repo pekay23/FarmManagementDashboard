@@ -33,7 +33,7 @@ export interface CropTreatment {
   sync_id?: string; 
 }
 
-export interface Livestock { id?: number; animal_id: string; species: string; breed: string; xes: string; current_weight_kg: number; date_of_birth: string; health_status: string; sync_status?: string; sync_id?: string; }
+export interface Livestock { id?: number; animal_id: string; species: string; breed: string; sex: string; current_weight_kg: number; date_of_birth: string; health_status: string; sync_status?: string; sync_id?: string; }
 export interface Sale { id?: number; buyer_name: string; total_amount: number; sale_date: string; items_snapshot?: any[]; sync_status?: string; sync_id?: string; }
 export interface Task { id?: number; title: string; due_date: string; status: string; priority?: string; assigned_to?: string; sync_status?: string; sync_id?: string; }
 export interface Log { id?: number; type: string; livestock_id: number; date?: string; sync_status?: string; sync_id?: string; [key: string]: any; }
