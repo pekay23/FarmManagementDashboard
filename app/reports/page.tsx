@@ -12,7 +12,7 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { logoBase64 } from '@/lib/logo';
-import { addSvgToPdf } from '@/lib/pdfUtils'; // Import the SVG helper
+import { addSvgToPdf } from '@/lib/pdfUtils'; 
 
 const COLORS = ['#22c55e', '#eab308', '#3b82f6', '#f97316', '#ef4444', '#8b5cf6'];
 
@@ -33,7 +33,11 @@ export default function Reports() {
       const res = await fetch(`/api/reports?type=${reportType}&period=${period}`);
       const json = await res.json();
       setData(json);
-    } catch (e) { console.error(e); } finally { setLoading(false); }
+    } catch (e) { 
+        console.error(e); 
+    } finally { 
+        setLoading(false); 
+    }
   }
 
   const handleTypeChange = (e: any) => { setReportType(e.target.value); setData(null); setLoading(true); };
@@ -44,11 +48,9 @@ export default function Reports() {
     setTimeout(() => setToast({ show: false, message: '' }), 3000);
   }
 
-  // UPDATED PDF Function
   async function generatePDF() {
     if (!data) return;
     const doc = new jsPDF();
-
     doc.setFillColor(34, 197, 94);
     doc.rect(0, 0, 210, 45, 'F');
     
@@ -61,26 +63,26 @@ export default function Reports() {
     doc.setFontSize(22);
     doc.text(`${reportType.toUpperCase()} REPORT`, 105, 28, { align: "center" });
     
-    const kpiRows = Object.entries(data.kpi).map(([key, val]: any) => [key.replace(/_/g, ' ').toUpperCase(), val]);
-    autoTable(doc, { startY: 65, head: [['Metric', 'Value']], body: kpiRows });
+    if (data.kpi) {
+        const kpiRows = Object.entries(data.kpi).map(([key, val]: any) => [key.replace(/_/g, ' ').toUpperCase(), val]);
+        autoTable(doc, { startY: 65, head: [['Metric', 'Value']], body: kpiRows });
+    }
     
     doc.save(`${reportType}_Report.pdf`);
     showNotification("Report downloaded successfully");
   }
 
   // --- DYNAMIC CONTENT RENDERERS ---
-
   const renderKPIs = () => {
     if (!data?.kpi) return null;
-
     switch (reportType) {
         case 'overview':
             return (
                 <>
-                    <KpiCard title="Total Crops" value={data.kpi.crops || 0} sub="+12% from last period" icon={Sprout} color="green" />
-                    <KpiCard title="Total Animals" value={data.kpi.animals || 0} sub="+8% from last period" icon={PawPrint} color="blue" />
-                    <KpiCard title="Total Sales" value={`GH₵ ${(data.kpi.sales || 0).toLocaleString()}`} sub="+23% from last period" icon={DollarSign} color="purple" />
-                    <KpiCard title="Task Completion" value={`${data.kpi.completion_rate || 0}%`} sub="+5% from last period" icon={TrendingUp} color="orange" />
+                    <KpiCard title="Total Crops" value={data.kpi.crops || 0} sub="Active Fields" icon={Sprout} color="green" />
+                    <KpiCard title="Total Animals" value={data.kpi.animals || 0} sub="On Farm" icon={PawPrint} color="blue" />
+                    <KpiCard title="Total Sales" value={`GH₵ ${(data.kpi.sales || 0).toLocaleString()}`} sub="Revenue" icon={DollarSign} color="purple" />
+                    <KpiCard title="Task Completion" value={`${data.kpi.completion_rate || 0}%`} sub="Efficiency" icon={TrendingUp} color="orange" />
                 </>
             );
         case 'sales':
@@ -132,177 +134,214 @@ export default function Reports() {
 
   const renderCharts = () => {
     if (!data?.charts) return null;
+    const commonGrid = <CartesianGrid strokeDasharray="3 3" vertical={false} />;
 
     switch (reportType) {
         case 'overview':
             return (
                 <>
                     <ChartCard title="Sales Trend">
-                        <AreaChart data={data.charts.salesTrend}>
-                            <defs>
-                                <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
-                                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Area type="monotone" dataKey="value" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorSales)" />
-                        </AreaChart>
+                        {data.charts.salesTrend && data.charts.salesTrend.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={data.charts.salesTrend}>
+                                    <defs>
+                                        <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+                                            <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                                        </linearGradient>
+                                    </defs>
+                                    {commonGrid}
+                                    <XAxis dataKey="name" fontSize={12} />
+                                    <YAxis fontSize={12} />
+                                    <Tooltip />
+                                    <Area type="monotone" dataKey="value" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorSales)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        ) : <div className="h-full flex items-center justify-center text-gray-400">No data</div>}
                     </ChartCard>
+
                     <ChartCard title="Crop Distribution">
-                        <PieChart>
-                            <Pie data={data.charts.cropDist} cx="50%" cy="50%" innerRadius={60} outerRadius={100} fill="#8884d8" paddingAngle={5} dataKey="value">
-                                {data.charts.cropDist?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                            </Pie>
-                            <Tooltip />
-                            <Legend />
-                        </PieChart>
+                        {data.charts.cropDist && data.charts.cropDist.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie data={data.charts.cropDist} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} dataKey="value">
+                                        {data.charts.cropDist.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                    </Pie>
+                                    <Tooltip />
+                                    <Legend verticalAlign="bottom" height={36}/>
+                                </PieChart>
+                            </ResponsiveContainer>
+                        ) : <div className="h-full flex items-center justify-center text-gray-400">No crop data</div>}
                     </ChartCard>
                 </>
             );
+
         case 'sales':
             return (
                 <>
                     <div className="lg:col-span-2">
                         <ChartCard title="Revenue Trend Analysis">
-                            <AreaChart data={data.charts.salesTrend}>
-                                <defs>
-                                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
-                                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" />
-                                <YAxis />
-                                <Tooltip />
-                                <Area type="monotone" dataKey="value" name="Revenue" stroke="#22c55e" fill="url(#colorRev)" />
-                            </AreaChart>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={data.charts.salesTrend || []}>
+                                    <defs>
+                                        <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
+                                            <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                                        </linearGradient>
+                                    </defs>
+                                    {commonGrid}
+                                    <XAxis dataKey="name" />
+                                    <YAxis />
+                                    <Tooltip />
+                                    <Area type="monotone" dataKey="value" name="Revenue" stroke="#22c55e" fill="url(#colorRev)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
                         </ChartCard>
                     </div>
                     <div className="lg:col-span-2">
                         <ChartCard title="Top Selling Products">
-                            <BarChart data={data.charts.topItems} layout="vertical">
-                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                                <XAxis type="number" />
-                                <YAxis dataKey="name" type="category" width={100} />
-                                <Tooltip cursor={{fill: 'transparent'}} />
-                                <Bar dataKey="value" name="Revenue" fill="#8b5cf6" barSize={25} radius={[0, 4, 4, 0]} />
-                            </BarChart>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={data.charts.topItems || []} layout="vertical">
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                                    <XAxis type="number" />
+                                    <YAxis dataKey="name" type="category" width={100} fontSize={12} />
+                                    <Tooltip cursor={{fill: 'transparent'}} />
+                                    <Bar dataKey="value" name="Revenue" fill="#8b5cf6" barSize={25} radius={[0, 4, 4, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
                         </ChartCard>
                     </div>
                 </>
             );
+
         case 'inventory':
             return (
                 <>
                     <ChartCard title="Top Stock Levels">
-                        <BarChart data={data.charts.stockLevels} layout="vertical" margin={{ left: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                            <XAxis type="number" />
-                            <YAxis dataKey="name" type="category" width={100} />
-                            <Tooltip cursor={{fill: 'transparent'}} />
-                            <Bar dataKey="value" name="Quantity" fill="#3b82f6" barSize={20} radius={[0, 4, 4, 0]} />
-                        </BarChart>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={data.charts.stockLevels || []} layout="vertical" margin={{ left: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                                <XAxis type="number" />
+                                <YAxis dataKey="name" type="category" width={100} fontSize={12} />
+                                <Tooltip cursor={{fill: 'transparent'}} />
+                                <Bar dataKey="value" name="Quantity" fill="#3b82f6" barSize={20} radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
                     </ChartCard>
                     <ChartCard title="Value by Category">
-                        <PieChart>
-                            <Pie data={data.charts.categoryValue} cx="50%" cy="50%" innerRadius={60} outerRadius={100} fill="#8884d8" dataKey="value">
-                                {data.charts.categoryValue?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                            </Pie>
-                            <Tooltip />
-                            <Legend />
-                        </PieChart>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie data={data.charts.categoryValue || []} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" dataKey="value">
+                                    {data.charts.categoryValue?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                </Pie>
+                                <Tooltip />
+                                <Legend />
+                            </PieChart>
+                        </ResponsiveContainer>
                     </ChartCard>
                 </>
             );
+
         case 'tasks':
             return (
                 <>
                     <ChartCard title="Employee Performance (Completed)">
-                        <BarChart data={data.charts.empPerformance}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" />
-                            <YAxis allowDecimals={false} />
-                            <Tooltip cursor={{fill: 'transparent'}} />
-                            <Bar dataKey="value" name="Tasks" fill="#f97316" barSize={40} radius={[4, 4, 0, 0]} />
-                        </BarChart>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={data.charts.empPerformance || []}>
+                                {commonGrid}
+                                <XAxis dataKey="name" />
+                                <YAxis allowDecimals={false} />
+                                <Tooltip cursor={{fill: 'transparent'}} />
+                                <Bar dataKey="value" name="Tasks" fill="#f97316" barSize={40} radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
                     </ChartCard>
                     <ChartCard title="Pending Tasks by Priority">
-                        <PieChart>
-                            <Pie data={data.charts.priorityDist} cx="50%" cy="50%" outerRadius={100} fill="#8884d8" dataKey="value" label>
-                                {data.charts.priorityDist?.map((entry: any, index: number) => (
-                                    <Cell key={`cell-${index}`} fill={entry.name === 'high' ? '#ef4444' : entry.name === 'medium' ? '#eab308' : '#3b82f6'} />
-                                ))}
-                            </Pie>
-                            <Tooltip />
-                            <Legend />
-                        </PieChart>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie data={data.charts.priorityDist || []} cx="50%" cy="50%" outerRadius={80} fill="#8884d8" dataKey="value" label>
+                                    {data.charts.priorityDist?.map((entry: any, index: number) => (
+                                        <Cell key={`cell-${index}`} fill={entry.name === 'high' ? '#ef4444' : entry.name === 'medium' ? '#eab308' : '#3b82f6'} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                                <Legend />
+                            </PieChart>
+                        </ResponsiveContainer>
                     </ChartCard>
                 </>
             );
+
         case 'crops':
             return (
                 <>
                     <ChartCard title="Yield Estimates vs Actuals">
-                        <BarChart data={data.charts.yieldComparison}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Legend />
-                            <Bar dataKey="estimated" name="Est. Yield (kg)" fill="#fbbf24" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="actual" name="Act. Yield (kg)" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                        </BarChart>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={data.charts.yieldComparison || []}>
+                                {commonGrid}
+                                <XAxis dataKey="name" />
+                                <YAxis />
+                                <Tooltip />
+                                <Legend />
+                                <Bar dataKey="estimated" name="Est. Yield (kg)" fill="#fbbf24" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="actual" name="Act. Yield (kg)" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
                     </ChartCard>
                     <ChartCard title="Land Usage (Acres)">
-                        <PieChart>
-                            <Pie data={data.charts.landUsage} cx="50%" cy="50%" outerRadius={100} fill="#8884d8" dataKey="value" label>
-                                {data.charts.landUsage?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                            </Pie>
-                            <Tooltip />
-                            <Legend />
-                        </PieChart>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie data={data.charts.landUsage || []} cx="50%" cy="50%" outerRadius={80} fill="#8884d8" dataKey="value" label>
+                                    {data.charts.landUsage?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                </Pie>
+                                <Tooltip />
+                                <Legend />
+                            </PieChart>
+                        </ResponsiveContainer>
                     </ChartCard>
                 </>
             );
+
         case 'livestock':
             return (
                 <>
                     <ChartCard title="Species Distribution">
-                        <PieChart>
-                            <Pie data={data.charts.speciesDist} cx="50%" cy="50%" outerRadius={100} fill="#8884d8" dataKey="value" label>
-                                {data.charts.speciesDist?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                            </Pie>
-                            <Tooltip />
-                            <Legend />
-                        </PieChart>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie data={data.charts.speciesDist || []} cx="50%" cy="50%" outerRadius={80} fill="#8884d8" dataKey="value" label>
+                                    {data.charts.speciesDist?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                </Pie>
+                                <Tooltip />
+                                <Legend />
+                            </PieChart>
+                        </ResponsiveContainer>
                     </ChartCard>
                     <ChartCard title="Health Status">
-                        <BarChart data={data.charts.healthDist}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" />
-                            <YAxis allowDecimals={false} />
-                            <Tooltip cursor={{fill: 'transparent'}} />
-                            <Bar dataKey="value" name="Count" fill="#ef4444" radius={[4, 4, 0, 0]}>
-                                {data.charts.healthDist?.map((entry: any, index: number) => (
-                                    <Cell key={`cell-${index}`} fill={entry.name === 'Healthy' ? '#22c55e' : entry.name === 'Sick' ? '#ef4444' : '#eab308'} />
-                                ))}
-                            </Bar>
-                        </BarChart>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={data.charts.healthDist || []}>
+                                {commonGrid}
+                                <XAxis dataKey="name" />
+                                <YAxis allowDecimals={false} />
+                                <Tooltip cursor={{fill: 'transparent'}} />
+                                <Bar dataKey="value" name="Count" fill="#ef4444" radius={[4, 4, 0, 0]}>
+                                    {data.charts.healthDist?.map((entry: any, index: number) => (
+                                        <Cell key={`cell-${index}`} fill={entry.name === 'Healthy' ? '#22c55e' : entry.name === 'Sick' ? '#ef4444' : '#eab308'} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
                     </ChartCard>
                     <div className="lg:col-span-2">
                         <ChartCard title="Gender Distribution">
-                            <BarChart data={data.charts.genderDist} layout="vertical" margin={{ left: 20 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                                <XAxis type="number" />
-                                <YAxis dataKey="name" type="category" width={80} />
-                                <Tooltip cursor={{fill: 'transparent'}} />
-                                <Bar dataKey="value" name="Count" fill="#3b82f6" barSize={30} radius={[0, 4, 4, 0]} />
-                            </BarChart>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={data.charts.genderDist || []} layout="vertical" margin={{ left: 20 }}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                                    <XAxis type="number" />
+                                    <YAxis dataKey="name" type="category" width={80} />
+                                    <Tooltip cursor={{fill: 'transparent'}} />
+                                    <Bar dataKey="value" name="Count" fill="#3b82f6" barSize={30} radius={[0, 4, 4, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
                         </ChartCard>
                     </div>
                 </>
@@ -337,7 +376,6 @@ export default function Reports() {
                 </select>
                 <ChevronDown className="w-4 h-4 text-gray-500 absolute right-3 top-3 pointer-events-none" />
             </div>
-
             <div className="relative">
                 <select className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-green-500 font-bold shadow-sm" value={reportType} onChange={handleTypeChange}>
                     <option value="overview">Overview Report</option>
@@ -349,7 +387,6 @@ export default function Reports() {
                 </select>
                 <Filter className="w-4 h-4 text-gray-500 absolute right-3 top-3 pointer-events-none" />
             </div>
-
             <button onClick={generatePDF} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors shadow-lg shadow-green-200">
                 <FileDown className="w-4 h-4" /> Generate PDF
             </button>
@@ -393,12 +430,13 @@ function KpiCard({ title, value, sub, icon: Icon, color }: any) {
     );
 }
 
+// Fixed ChartCard: Removes default inner div to let ResponsiveContainer work
 function ChartCard({ title, children }: any) {
     return (
-        <div className="bg-white p-6 rounded-xl border-2 border-gray-100 shadow-sm h-96 hover:border-gray-200 transition-colors">
-            <h3 className="text-lg font-bold text-gray-800 mb-6">{title}</h3>
-            <div className="h-full w-full pb-10">
-                <ResponsiveContainer width="100%" height="100%">{children}</ResponsiveContainer>
+        <div className="bg-white p-6 rounded-xl border-2 border-gray-100 shadow-sm h-96 hover:border-gray-200 transition-colors flex flex-col">
+            <h3 className="text-lg font-bold text-gray-800 mb-6 shrink-0">{title}</h3>
+            <div className="flex-1 min-h-0 w-full relative">
+                {children}
             </div>
         </div>
     );
