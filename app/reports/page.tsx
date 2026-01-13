@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { 
-  BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, 
+  BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, 
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { 
-  Sprout, PawPrint, DollarSign, CheckCircle, FileDown, Calendar, Filter, 
+  Sprout, PawPrint, DollarSign, CheckCircle, FileDown, Filter, 
   ChevronDown, Layers, AlertCircle, Clock, Package, AlertTriangle, TrendingUp, HeartPulse 
 } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -32,6 +32,21 @@ export default function Reports() {
     try {
       const res = await fetch(`/api/reports?type=${reportType}&period=${period}`);
       const json = await res.json();
+
+      // --- CRITICAL FIX: Convert strings to numbers ---
+      // Postgres/Neon often returns decimals as strings. Recharts Pie charts fail with strings.
+      if (json.charts) {
+        Object.keys(json.charts).forEach(key => {
+            if (Array.isArray(json.charts[key])) {
+                json.charts[key] = json.charts[key].map((item: any) => ({
+                    ...item,
+                    value: Number(item.value) || 0 // Force conversion
+                }));
+            }
+        });
+      }
+      // -----------------------------------------------
+
       setData(json);
     } catch (e) { 
         console.error(e); 
@@ -164,8 +179,19 @@ export default function Reports() {
                         {data.charts.cropDist && data.charts.cropDist.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
-                                    <Pie data={data.charts.cropDist} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} dataKey="value">
-                                        {data.charts.cropDist.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                    <Pie 
+                                        data={data.charts.cropDist} 
+                                        cx="50%" 
+                                        cy="50%" 
+                                        innerRadius={60} 
+                                        outerRadius={80} 
+                                        fill="#8884d8" 
+                                        paddingAngle={5} 
+                                        dataKey="value"
+                                    >
+                                        {data.charts.cropDist.map((entry: any, index: number) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
                                     </Pie>
                                     <Tooltip />
                                     <Legend verticalAlign="bottom" height={36}/>
@@ -430,7 +456,6 @@ function KpiCard({ title, value, sub, icon: Icon, color }: any) {
     );
 }
 
-// Fixed ChartCard: Removes default inner div to let ResponsiveContainer work
 function ChartCard({ title, children }: any) {
     return (
         <div className="bg-white p-6 rounded-xl border-2 border-gray-100 shadow-sm h-96 hover:border-gray-200 transition-colors flex flex-col">
