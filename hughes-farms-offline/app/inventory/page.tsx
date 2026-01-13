@@ -1,35 +1,48 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Package, AlertTriangle, TrendingDown, Plus, Search, X, Loader2, Pencil, Trash2, CheckCircle } from 'lucide-react';
+import { 
+  Package, AlertTriangle, TrendingDown, Plus, Search, 
+  X, Loader2, Pencil, Trash2, CheckCircle, Wifi, WifiOff 
+} from 'lucide-react';
+
+// Database Imports
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/dbLocal';
+import { syncTable, fetchAndCache } from '@/lib/syncUtils';
 
 export default function Inventory() {
-  const [items, setItems] = useState<any[]>([]);
+  // --- 1. LOCAL DATA (FIXED) ---
+  // We use db.inventory.reverse().toArray() to safely get items last-added-first
+  const items = useLiveQuery(() => db.inventory.reverse().toArray()) || [];
+
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
   
-  // Modal & Form State
+  // UI State
+  const [isOnline, setIsOnline] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
-
-  // Notification State
   const [toast, setToast] = useState({ show: false, message: '' });
 
-  // FETCH DATA
+  // --- 2. SYNC LOGIC ---
   useEffect(() => {
-    fetchInventory();
+    setIsLoading(false); // Client mounted
+
+    if (typeof window !== 'undefined') {
+        setIsOnline(navigator.onLine);
+        window.addEventListener('online', () => { setIsOnline(true); runSync(); });
+        window.addEventListener('offline', () => setIsOnline(false));
+    }
+    
+    runSync();
   }, []);
 
-  async function fetchInventory() {
-    try {
-      const res = await fetch('/api/inventory');
-      const data = await res.json();
-      if (Array.isArray(data)) setItems(data);
-    } catch (error) {
-      console.error("Failed to load inventory", error);
-    } finally {
-      setIsLoading(false);
+  async function runSync() {
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+        await syncTable('inventory', '/api/inventory');
+        await fetchAndCache('inventory', '/api/inventory');
     }
   }
 
@@ -53,73 +66,56 @@ export default function Inventory() {
     setIsModalOpen(true);
   }
 
-  // HANDLE DELETE
-  async function handleDelete(id: string) {
+  // --- 3. HANDLE DELETE (Local First) ---
+  async function handleDelete(id: number) {
     if (!confirm('Are you sure you want to delete this item?')) return;
 
-    const previousItems = [...items];
-    setItems(items.filter(i => i.id !== id)); // Optimistic update
-
     try {
-      const res = await fetch(`/api/inventory/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-          showNotification('Item deleted successfully');
-      } else {
-          throw new Error('Failed');
-      }
+      await db.inventory.update(id, { sync_status: 'deleted' });
+      showNotification('Item marked for deletion');
+      runSync(); 
     } catch (error) {
       console.error("Failed to delete", error);
-      setItems(previousItems); // Revert on error
-      alert("Failed to delete item.");
+      showNotification("Failed to delete item.");
     }
   }
 
-  // HANDLE FORM SUBMIT (ADD OR EDIT)
+  // --- 4. HANDLE FORM SUBMIT (Local First) ---
   async function handleSubmit(e: any) {
     e.preventDefault();
     setIsSubmitting(true);
 
     const formData = {
-      name: e.target.name.value,
+      item_name: e.target.name.value,
       category: e.target.category.value,
       quantity: parseFloat(e.target.quantity.value),
       unit: e.target.unit.value,
-      threshold: parseFloat(e.target.threshold.value),
-      price: parseFloat(e.target.price.value),
-      supplier: e.target.supplier.value
+      min_threshold: parseFloat(e.target.threshold.value),
+      unit_price: parseFloat(e.target.price.value),
+      supplier: e.target.supplier.value,
+      last_updated: new Date().toISOString()
     };
 
     try {
-      let res;
       if (editingItem) {
-        // EDIT MODE
-        res = await fetch(`/api/inventory/${editingItem.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+        await db.inventory.update(editingItem.id, {
+            ...formData,
+            sync_status: 'pending_update'
         });
+        showNotification('Item updated locally');
       } else {
-        // ADD MODE
-        res = await fetch('/api/inventory', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        });
+        await db.inventory.add({
+            ...formData,
+            sync_status: 'pending_create'
+        } as any);
+        showNotification('Item added locally');
       }
-
-      if (res.ok) {
-        const savedItem = await res.json();
-        if (editingItem) {
-            setItems(items.map(i => i.id === savedItem.id ? savedItem : i));
-            showNotification('Item updated successfully');
-        } else {
-            setItems([savedItem, ...items]);
-            showNotification('Item added successfully');
-        }
-        setIsModalOpen(false);
-      }
+      
+      setIsModalOpen(false);
+      runSync(); 
     } catch (error) {
       console.error("Failed to save item", error);
+      showNotification("Error saving item");
     } finally {
       setIsSubmitting(false);
     }
@@ -127,17 +123,20 @@ export default function Inventory() {
 
   // Filter Logic
   const categories = ['All', 'Seeds', 'Fertilizers', 'Pesticides', 'Feeds', 'Medicines', 'Low Stock'];
-  const filteredItems = items.filter(item => {
+
+  const filteredItems = (items || []).filter((item: any) => {
+    if (item.sync_status === 'deleted') return false;
     if (activeCategory === 'All') return true;
     if (activeCategory === 'Low Stock') return Number(item.quantity) <= Number(item.min_threshold);
     return item.category === activeCategory;
   });
 
-  const lowStockCount = items.filter(i => Number(i.quantity) <= Number(i.min_threshold)).length;
-  const totalValue = items.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.unit_price)), 0);
+  const validItems = (items || []).filter((i: any) => i.sync_status !== 'deleted');
+  const lowStockCount = validItems.filter((i: any) => Number(i.quantity) <= Number(i.min_threshold)).length;
+  const totalValue = validItems.reduce((acc: number, item: any) => acc + (Number(item.quantity) * Number(item.unit_price)), 0);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto relative">
+    <div className="p-8 max-w-7xl mx-auto relative min-h-screen">
       
       {/* SUCCESS TOAST NOTIFICATION */}
       {toast.show && (
@@ -156,7 +155,13 @@ export default function Inventory() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
-          <p className="text-gray-500">Track your farm supplies and materials</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-gray-500">Track your farm supplies and materials</p>
+            {isOnline ? 
+                <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full flex items-center gap-1 ml-2"><Wifi className="w-3 h-3"/> Online</span> : 
+                <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full flex items-center gap-1 ml-2"><WifiOff className="w-3 h-3"/> Offline</span>
+            }
+          </div>
         </div>
         <button 
           onClick={openAddModal}
@@ -169,7 +174,7 @@ export default function Inventory() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <InventoryKpi title="Total Items" value={items.length.toString()} icon={Package} color="blue" />
+        <InventoryKpi title="Total Items" value={validItems.length.toString()} icon={Package} color="blue" />
         <InventoryKpi title="Low Stock Items" value={lowStockCount.toString()} icon={AlertTriangle} color="red" />
         <InventoryKpi title="Total Value" value={`GH₵ ${totalValue.toLocaleString()}`} icon={TrendingDown} color="green" />
       </div>
@@ -211,13 +216,16 @@ export default function Inventory() {
                 </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
+                {filteredItems.length === 0 && (
+                    <tr><td colSpan={9} className="p-8 text-center text-gray-400">No inventory items found.</td></tr>
+                )}
                 {filteredItems.map((item: any) => {
                     const isLow = Number(item.quantity) <= Number(item.min_threshold);
-                    const totalValue = Number(item.quantity) * Number(item.unit_price);
+                    const val = Number(item.quantity) * Number(item.unit_price);
                     
                     const dateObj = item.last_updated ? new Date(item.last_updated) : new Date();
                     const dateStr = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
+                    
                     return (
                     <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                         <td className="p-4">
@@ -228,7 +236,7 @@ export default function Inventory() {
                         <td className="p-4 font-medium">{item.quantity} {item.unit}</td>
                         <td className="p-4 text-gray-500 text-sm">{item.min_threshold} {item.unit}</td>
                         <td className="p-4 text-gray-600">GH₵ {Number(item.unit_price).toFixed(2)}</td>
-                        <td className="p-4 font-bold text-gray-800">GH₵ {totalValue.toFixed(2)}</td>
+                        <td className="p-4 font-bold text-gray-800">GH₵ {val.toFixed(2)}</td>
                         <td className="p-4 text-xs text-gray-500 font-mono whitespace-nowrap">{dateStr}</td>
                         <td className="p-4">
                             <span className={`px-2 py-1 rounded-full text-xs font-bold ${isLow ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
@@ -281,7 +289,7 @@ export default function Inventory() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                  <input name="quantity" required type="number" defaultValue={editingItem?.quantity} className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-green-500" />
+                  <input name="quantity" required type="number" step="0.01" defaultValue={editingItem?.quantity} className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-green-500" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
@@ -292,7 +300,7 @@ export default function Inventory() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Threshold</label>
-                  <input name="threshold" required type="number" defaultValue={editingItem?.min_threshold || 10} className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-green-500" />
+                  <input name="threshold" required type="number" step="0.01" defaultValue={editingItem?.min_threshold || 10} className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-green-500" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Price (GH₵)</label>

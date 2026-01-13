@@ -12,6 +12,7 @@
     "@neondatabase/serverless": "^1.0.2",
     "canvg": "^4.0.3",
     "dexie": "^4.2.1",
+    "dexie-react-hooks": "^4.2.0",
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.562.0",

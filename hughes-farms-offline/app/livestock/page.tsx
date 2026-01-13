@@ -1,77 +1,75 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Cat, HeartPulse, Syringe, Plus, X, Weight, FileDown, Pencil, CheckCircle } from 'lucide-react';
+import { 
+  Cat, HeartPulse, Syringe, Plus, X, Weight, 
+  FileDown, Pencil, CheckCircle, Wifi, WifiOff 
+} from 'lucide-react';
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { logoBase64 } from '@/lib/logo';
 import { addSvgToPdf } from '@/lib/pdfUtils';
 
+// Database Imports
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/dbLocal';
+import { syncTable, fetchAndCache } from '@/lib/syncUtils';
+
 export default function LivestockManagement() {
-  const [animals, setAnimals] = useState<any[]>([]);
+  // --- LOCAL DATA ---
+  const animals = useLiveQuery(() => db.livestock.toArray()) || [];
+  
+  // Local History Data (Filtered by selected animal later)
+  // We fetch all history records locally. For huge datasets, you'd index query this.
+  const allLogs = useLiveQuery(() => db.logs.toArray()) || [];
+
   const [selectedAnimal, setSelectedAnimal] = useState<any>(null);
   
-  // History Data State
-  const [vaccines, setVaccines] = useState<any[]>([]);
-  const [treatments, setTreatments] = useState<any[]>([]);
-  const [weights, setWeights] = useState<any[]>([]);
+  // Derived state for history
+  const vaccines = allLogs.filter(l => l.livestock_id === selectedAnimal?.id && l.type === 'vaccine');
+  const treatments = allLogs.filter(l => l.livestock_id === selectedAnimal?.id && l.type === 'treatment');
+  const weights = allLogs.filter(l => l.livestock_id === selectedAnimal?.id && l.type === 'weight');
 
   // Modals
   const [modalType, setModalType] = useState<string | null>(null);
   const [editingAnimal, setEditingAnimal] = useState<any>(null);
-
-  // Notification State
   const [toast, setToast] = useState({ show: false, message: '' });
+  const [isOnline, setIsOnline] = useState(true);
 
-  // --- DATA FETCHING ---
+  // --- SYNC & INIT ---
   useEffect(() => {
-    fetchAnimals();
+    if (typeof window !== 'undefined') {
+        setIsOnline(navigator.onLine);
+        window.addEventListener('online', () => { setIsOnline(true); runSync(); });
+        window.addEventListener('offline', () => setIsOnline(false));
+    }
+    runSync();
   }, []);
 
-  useEffect(() => {
-    if (selectedAnimal) {
-      fetchHistory(selectedAnimal.id);
-    }
-  }, [selectedAnimal]);
-
-  async function fetchAnimals() {
-    try {
-      const res = await fetch('/api/livestock');
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setAnimals(data);
-      } else {
-        setAnimals([]); 
-      }
-    } catch (error) {
-      setAnimals([]);
+  async function runSync() {
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+        await syncTable('livestock', '/api/livestock');
+        await syncTable('logs', '/api/livestock/history'); // Assuming logs table for history
+        
+        await fetchAndCache('livestock', '/api/livestock');
+        // Fetch history might need a custom endpoint or be included in livestock sync
+        // For now, let's assume we fetch history logs separately
+        await fetchAndCache('logs', '/api/livestock/history'); 
     }
   }
 
-  async function fetchHistory(id: string) {
-    const [vRes, tRes, wRes] = await Promise.all([
-      fetch(`/api/livestock/history?type=vaccines&id=${id}`),
-      fetch(`/api/livestock/history?type=treatments&id=${id}`),
-      fetch(`/api/livestock/history?type=weights&id=${id}`)
-    ]);
-    if(vRes.ok) setVaccines(await vRes.json());
-    if(tRes.ok) setTreatments(await tRes.json());
-    if(wRes.ok) setWeights(await wRes.json());
-  }
-
-  // --- PDF GENERATOR (UPDATED) ---
+  // --- PDF GENERATOR ---
   async function generateHealthBooklet() {
     if (!selectedAnimal) return;
     const doc = new jsPDF();
-
     doc.setFillColor(34, 197, 94);
-    doc.rect(0, 0, 210, 45, 'F'); // Increased height
+    doc.rect(0, 0, 210, 45, 'F'); 
     
     if (logoBase64) {
       const svgString = atob(logoBase64.split(',')[1]);
-      await addSvgToPdf(doc, svgString, 15, 7, 30, 30); // Repositioned and resized
+      await addSvgToPdf(doc, svgString, 15, 7, 30, 30); 
     }
-
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.text("ANIMAL HEALTH BOOKLET", 105, 28, { align: "center" });
@@ -81,26 +79,28 @@ export default function LivestockManagement() {
     doc.text(`ID: ${selectedAnimal.animal_id}`, 14, 50);
     doc.text(`Species: ${selectedAnimal.species}`, 14, 58);
     doc.text(`Breed: ${selectedAnimal.breed}`, 14, 66);
-    doc.text(`Gender: ${selectedAnimal.sex}`, 100, 58);
+    doc.text(`Gender: ${selectedAnimal.sex}`, 100, 58); 
     doc.text(`Status: ${selectedAnimal.health_status}`, 100, 66);
-
+    
     doc.setFontSize(14);
     doc.setTextColor(34, 197, 94);
     doc.text("Vaccination Record", 14, 85);
+    
     autoTable(doc, {
       startY: 90,
       head: [['Date', 'Vaccine Name', 'Batch #', 'Veterinarian']],
-      body: vaccines.map(v => [new Date(v.vaccination_date).toLocaleDateString(), v.vaccine_name, v.batch_number, v.veterinarian]),
+      body: vaccines.map((v: any) => [new Date(v.date).toLocaleDateString(), v.name, v.batch, v.vet]),
     });
-
+    
     const finalY = (doc as any).lastAutoTable.finalY || 90;
     doc.text("Treatment History", 14, finalY + 15);
+    
     autoTable(doc, {
       startY: finalY + 20,
       head: [['Date', 'Condition', 'Medication', 'Dosage', 'Vet']],
-      body: treatments.map(t => [new Date(t.treatment_date).toLocaleDateString(), t.condition, t.medication, t.dosage, t.veterinarian]),
+      body: treatments.map((t: any) => [new Date(t.date).toLocaleDateString(), t.condition, t.medication, t.dosage, t.vet]),
     });
-
+    
     doc.save(`${selectedAnimal.animal_id}_Health_Booklet.pdf`);
     showNotification('Health Booklet downloaded!');
   }
@@ -121,26 +121,27 @@ export default function LivestockManagement() {
       breed: e.target.breed.value,
       sex: e.target.sex.value,
       date_of_birth: e.target.dob.value,
-      current_weight_kg: e.target.weight.value,
-      health_status: editingAnimal ? e.target.status.value : 'Healthy'
+      current_weight_kg: parseFloat(e.target.weight.value),
+      health_status: editingAnimal ? e.target.status.value : 'Healthy',
+      sync_status: editingAnimal ? 'pending_update' : 'pending_create'
     };
 
-    const method = editingAnimal ? 'PUT' : 'POST';
-    const body = editingAnimal ? { ...formData, id: editingAnimal.id } : formData;
-
-    const res = await fetch('/api/livestock', {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-
-    if (res.ok) {
-        fetchAnimals();
-        setModalType(null);
-        showNotification(editingAnimal ? 'Animal updated successfully' : 'Animal added successfully');
-        if (editingAnimal && selectedAnimal && editingAnimal.id === selectedAnimal.id) {
-            setSelectedAnimal({ ...selectedAnimal, ...formData });
+    try {
+        if (editingAnimal) {
+            await db.livestock.update(editingAnimal.id, formData);
+            if (selectedAnimal && editingAnimal.id === selectedAnimal.id) {
+                setSelectedAnimal({ ...selectedAnimal, ...formData });
+            }
+            showNotification('Animal updated locally');
+        } else {
+            await db.livestock.add(formData as any);
+            showNotification('Animal added locally');
         }
+        setModalType(null);
+        runSync();
+    } catch (err) {
+        console.error("Save failed", err);
+        showNotification("Error saving animal");
     }
   }
 
@@ -148,7 +149,13 @@ export default function LivestockManagement() {
     e.preventDefault();
     if (!selectedAnimal) return;
 
-    const baseData = { type, livestock_id: selectedAnimal.id };
+    const baseData = { 
+        type, 
+        livestock_id: selectedAnimal.id, 
+        created_at: new Date().toISOString(),
+        sync_status: 'pending_create'
+    };
+    
     let specificData = {};
 
     if (type === 'vaccine') {
@@ -169,24 +176,23 @@ export default function LivestockManagement() {
         };
     } else if (type === 'weight') {
         specificData = {
-            weight: e.target.w_weight.value,
+            weight: parseFloat(e.target.w_weight.value),
             date: e.target.w_date.value,
             notes: e.target.w_notes.value
         };
+        // Update animal's current weight too
+        await db.livestock.update(selectedAnimal.id, { 
+            current_weight_kg: parseFloat(e.target.w_weight.value),
+            sync_status: 'pending_update' 
+        });
     }
 
-    const res = await fetch('/api/livestock/history', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...baseData, ...specificData })
-    });
-
-    if (res.ok) {
-        fetchHistory(selectedAnimal.id);
-        if (type === 'weight') fetchAnimals(); 
-        setModalType(null);
-        showNotification('Record saved successfully');
-    }
+    // Save Log
+    await db.logs.add({ ...baseData, ...specificData } as any);
+    
+    setModalType(null);
+    showNotification('Record saved locally');
+    runSync();
   }
 
   return (
@@ -209,7 +215,13 @@ export default function LivestockManagement() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Livestock Management</h1>
-          <p className="text-gray-500">Monitor your animals' health and growth</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-gray-500">Monitor your animals' health and growth</p>
+            {isOnline ? 
+                <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full flex items-center gap-1 ml-2"><Wifi className="w-3 h-3"/> Online</span> : 
+                <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full flex items-center gap-1 ml-2"><WifiOff className="w-3 h-3"/> Offline</span>
+            }
+          </div>
         </div>
         <button 
           onClick={() => { setEditingAnimal(null); setModalType('animal'); }}
@@ -225,7 +237,7 @@ export default function LivestockManagement() {
         {/* LEFT COLUMN: Animal List */}
         <div className="flex-1 w-full space-y-4">
           {animals.length === 0 && <p className="text-gray-400 text-center py-10">No animals added yet.</p>}
-          {animals.map((animal) => (
+          {animals.map((animal: any) => (
             <div 
               key={animal.id}
               onClick={() => setSelectedAnimal(animal)}
@@ -241,11 +253,11 @@ export default function LivestockManagement() {
                 </div>
                 <StatusBadge status={animal.health_status} />
               </div>
-
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-gray-600 border-t border-gray-100 pt-3">
                 <span>Gender: <span className='font-medium text-gray-800'>{animal.sex}</span></span>
                 <span>Weight: <span className='font-medium text-gray-800'>{animal.current_weight_kg} kg</span></span>
-                <span>Vaccinations: <span className='font-medium text-gray-800'>{vaccines.filter(v => v.livestock_id === animal.id).length || '-'}</span></span>
+                {/* Count vaccines from local log */}
+                <span>Vaccinations: <span className='font-medium text-gray-800'>{allLogs.filter((l: any) => l.livestock_id === animal.id && l.type === 'vaccine').length}</span></span>
               </div>
             </div>
           ))}
@@ -278,10 +290,10 @@ export default function LivestockManagement() {
               {/* History Lists */}
               <div>
                  <h4 className="font-semibold text-gray-900 text-xs uppercase tracking-wide opacity-70 mb-2">Recent Vaccinations</h4>
-                 {vaccines.slice(0, 2).map((v, i) => (
+                 {vaccines.slice(0, 2).map((v: any, i: number) => (
                     <div key={i} className="flex justify-between text-sm py-1 border-b border-gray-50">
-                        <span className="text-green-700 font-medium">{v.vaccine_name}</span>
-                        <span className="text-gray-400 text-xs">{new Date(v.vaccination_date).toLocaleDateString()}</span>
+                        <span className="text-green-700 font-medium">{v.name}</span>
+                        <span className="text-gray-400 text-xs">{new Date(v.date).toLocaleDateString()}</span>
                     </div>
                  ))}
                  {vaccines.length === 0 && <p className="text-xs text-gray-400 italic">No records.</p>}
@@ -321,6 +333,7 @@ export default function LivestockManagement() {
               <input name="breed" defaultValue={editingAnimal?.breed} type="text" placeholder="Breed" className="w-full border p-3 rounded-lg outline-none focus:border-green-500" />
               
               <div className="grid grid-cols-2 gap-4">
+              
                 <select name="sex" defaultValue={editingAnimal?.sex} className="w-full border p-3 rounded-lg bg-white outline-none focus:border-green-500">
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
@@ -398,7 +411,6 @@ export default function LivestockManagement() {
             </form>
         </Modal>
       )}
-
     </div>
   );
 }
@@ -429,14 +441,14 @@ function DetailRow({ label, value, capitalize }: any) {
 }
 
 function ActionButton({ title, icon: Icon, color, onClick }: any) {
-    const colors = {
+    const colors: any = {
         green: 'bg-green-600 hover:bg-green-700',
         yellow: 'bg-yellow-500 hover:bg-yellow-600',
         blue: 'bg-blue-600 hover:bg-blue-700',
         orange: 'bg-orange-500 hover:bg-orange-600'
     }
     return (
-        <button onClick={onClick} className={`w-full ${colors[color as 'green'|'yellow'|'blue'|'orange']} text-white py-2.5 rounded-lg font-medium text-[11px] md:text-sm flex flex-col md:flex-row justify-center items-center gap-2 transition-colors`}>
+        <button onClick={onClick} className={`w-full ${colors[color]} text-white py-2.5 rounded-lg font-medium text-[11px] md:text-sm flex flex-col md:flex-row justify-center items-center gap-2 transition-colors`}>
             <Icon className="w-4 h-4" />
             {title}
         </button>
