@@ -1,4 +1,6 @@
 // app/layout.tsx
+import { signOut } from 'next-auth/react';
+import { LogOut } from 'lucide-react'; // Icon
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
