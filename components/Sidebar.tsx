@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import { 
   LayoutDashboard, Sprout, Cat, Package, ShoppingCart, 
-  Users, FileText, LogOut 
+  Users, FileText, LogOut, Settings // <--- Added Settings here
 } from 'lucide-react';
 import { logoBase64 } from '@/lib/logo';
 
@@ -17,12 +17,13 @@ const menuItems = [
   { name: 'Sales & Receipts', icon: ShoppingCart, href: '/sales' },
   { name: 'Employees & Tasks', icon: Users, href: '/employees' },
   { name: 'Reports', icon: FileText, href: '/reports' },
+  { name: 'Profile', icon: Settings, href: '/profile' }, // <--- Added Profile Page
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
 
-  // --- NEW: HIDE SIDEBAR ON LOGIN PAGE ---
+  // Hide sidebar on login page
   if (pathname === '/login') return null;
 
   return (
