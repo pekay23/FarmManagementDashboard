@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Sprout, Lock, Mail, Loader2 } from 'lucide-react';
+import { Lock, Mail, Loader2 } from 'lucide-react';
+import { logoBase64 } from '@/lib/logo'; // Import your logo
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,7 +29,7 @@ export default function LoginPage() {
       setError('Invalid email or password');
       setLoading(false);
     } else {
-      router.push('/'); // Redirect to dashboard on success
+      router.push('/'); 
       router.refresh();
     }
   }
@@ -37,9 +38,15 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
         <div className="text-center mb-8">
-          <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Sprout className="w-8 h-8 text-green-600" />
+          {/* --- REPLACED ICON WITH LOGO --- */}
+          <div className="w-24 h-24 mx-auto mb-4 flex items-center justify-center">
+            <img 
+                src={logoBase64} 
+                alt="Hughes Farms" 
+                className="w-full h-full object-contain" 
+            />
           </div>
+          
           <h1 className="text-2xl font-bold text-gray-900">Hughes Farms</h1>
           <p className="text-gray-500 text-sm">Sign in to manage your farm</p>
         </div>

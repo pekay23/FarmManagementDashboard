@@ -22,11 +22,13 @@ const menuItems = [
 export default function Sidebar() {
   const pathname = usePathname();
 
+  // --- NEW: HIDE SIDEBAR ON LOGIN PAGE ---
+  if (pathname === '/login') return null;
+
   return (
     <div className="h-screen w-64 bg-green-900 text-white fixed left-0 top-0 flex flex-col z-50 shadow-2xl">
       {/* --- LOGO SECTION --- */}
       <div className="p-4 flex items-center space-x-3 border-b border-green-800/50">
-        {/* Restored bigger size (w-16 = 64px) and removed background */}
         <div className="w-16 h-16 flex items-center justify-center shrink-0">
            <img 
              src={logoBase64}
@@ -55,7 +57,7 @@ export default function Sidebar() {
       {/* --- LOGOUT & FOOTER --- */}
       <div className="p-3 border-t border-green-800/50">
         <button 
-          onClick={() => signOut({ callbackUrl: '/login' })}
+          onClick={() => signOut({ redirect: true, callbackUrl: '/login' })}
           className="flex w-full items-center space-x-3 px-4 py-3 text-sm font-semibold rounded-lg text-red-300 hover:bg-red-900/30 hover:text-red-200 transition-all duration-200 mb-2"
         >
           <LogOut className="w-5 h-5 shrink-0" />

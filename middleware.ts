@@ -1,6 +1,13 @@
-export { default } from "next-auth/middleware";
+import { withAuth } from "next-auth/middleware";
+
+// Explicitly export the middleware function
+export default withAuth({
+  pages: {
+    signIn: "/login", // Redirect here if not logged in
+  },
+});
 
 export const config = {
-  // Protects all routes EXCEPT login, api, and static files
+  // Protect all routes EXCEPT login, api, static files, and images
   matcher: ["/((?!login|api|_next/static|_next/image|favicon.ico).*)"],
 };
