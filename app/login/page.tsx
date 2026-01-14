@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Lock, Mail, Loader2 } from 'lucide-react';
-import { logoBase64 } from '@/lib/logo'; // Import your logo
+import { logoBase64 } from '@/lib/logo';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,10 +35,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    // FIX: Using 'fixed inset-0' allows this page to ignore the global sidebar margin
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50 p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
         <div className="text-center mb-8">
-          {/* --- REPLACED ICON WITH LOGO --- */}
           <div className="w-24 h-24 mx-auto mb-4 flex items-center justify-center">
             <img 
                 src={logoBase64} 
