@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { 
-  Sprout, Users, DollarSign, Calendar, TrendingUp, AlertTriangle, 
-  CheckCircle, Activity, Package, Clock 
+  Sprout, Users, DollarSign, Calendar, TrendingUp, TrendingDown, AlertTriangle, 
+  CheckCircle, Activity, Package, Clock, Wallet
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import Link from 'next/link';
@@ -23,29 +23,31 @@ export default function Dashboard() {
           crops,
           sales,
           inventory,
-          tasks
+          tasks,
+          expenses // <--- 1. Fetch Expenses
         ] = await Promise.all([
           db.livestock.count(),
           db.crops.toArray(),
           db.sales.toArray(),
           db.inventory.toArray(),
-          db.tasks.toArray()
+          db.tasks.toArray(),
+          db.expenses.toArray()
         ]);
 
+        // 2. Calculate Financials
         const totalRevenue = sales.reduce((sum, sale) => sum + (Number(sale.amount) || 0), 0);
-        const pendingTasks = tasks.filter(t => t.status === 'Pending').length;
+        const totalExpenses = expenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+        const netProfit = totalRevenue - totalExpenses;
 
+        const pendingTasks = tasks.filter(t => t.status === 'Pending').length;
         const lowStock = inventory.filter(i => i.quantity <= i.lowStockThreshold);
         
-        // Fix for Dates on Tasks
         const overdue = tasks.filter(t => 
             t.status === 'Pending' && 
             t.dueDate && 
             new Date(t.dueDate).getTime() < new Date().getTime()
         );
         
-        // --- CRITICAL FIX HERE ---
-        // Include both 'Growing' and 'Planted' (and handle lowercase variants)
         const upcomingHarvests = crops
           .filter(c => {
               const status = c.status?.toLowerCase() || '';
@@ -66,6 +68,12 @@ export default function Dashboard() {
                 date: s.date || new Date().toISOString(), 
                 detail: `+GH₵${s.amount}` 
             })),
+            ...expenses.map(e => ({ 
+                type: 'expense', 
+                title: 'Expense: ' + e.title, 
+                date: e.date || new Date().toISOString(), 
+                detail: `-GH₵${e.amount}` 
+            })),
             ...tasks.filter(t => t.status === 'Completed').map(t => ({ 
                 type: 'task', 
                 title: 'Task Completed', 
@@ -79,6 +87,8 @@ export default function Dashboard() {
             crops: crops.length,
             animals: livestockCount,
             sales: totalRevenue,
+            expenses: totalExpenses, // <--- Add to State
+            profit: netProfit,       // <--- Add to State
             tasks: pendingTasks
           },
           alerts: { lowStock, overdue, harvests: upcomingHarvests },
@@ -99,8 +109,8 @@ export default function Dashboard() {
     return (
         <div className="p-8 max-w-[1600px] mx-auto min-h-screen space-y-8">
             <Skeleton className="h-12 w-1/3" />
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {[1,2,3,4].map(i => <Skeleton key={i} className="h-32 w-full" />)}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-32 w-full" />)}
             </div>
         </div>
     );
@@ -156,12 +166,17 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 3. KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
-        <KpiCard title="Total Crops" value={data?.kpi.crops || 0} icon={Sprout} color="teal" />
-        <KpiCard title="Total Animals" value={data?.kpi.animals || 0} icon={Users} color="yellow" />
+      {/* 3. KPI Cards (Expanded to include Financials) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
+        {/* Financial Row */}
+        <KpiCard title="Net Profit" value={`GH₵ ${(data?.kpi.profit || 0).toLocaleString()}`} icon={Wallet} color={data?.kpi.profit >= 0 ? "green" : "red"} />
         <KpiCard title="Total Revenue" value={`GH₵ ${(data?.kpi.sales || 0).toLocaleString()}`} icon={DollarSign} color="purple" />
-        <KpiCard title="Pending Tasks" value={data?.kpi.tasks || 0} icon={Calendar} color="blue" />
+        <KpiCard title="Total Expenses" value={`GH₵ ${(data?.kpi.expenses || 0).toLocaleString()}`} icon={TrendingDown} color="orange" />
+        
+        {/* Operational Row */}
+        <KpiCard title="Active Crops" value={data?.kpi.crops || 0} icon={Sprout} color="teal" />
+        <KpiCard title="Livestock" value={data?.kpi.animals || 0} icon={Users} color="blue" />
+        <KpiCard title="Pending Tasks" value={data?.kpi.tasks || 0} icon={Calendar} color="yellow" />
       </div>
 
       {/* 4. Main Grid: Charts & Activity */}
@@ -194,27 +209,37 @@ export default function Dashboard() {
 
         {/* Right: Weather & Activity Feed */}
         <div className="space-y-6">
-            
-            {/* Weather Widget */}
             <WeatherWidget />
 
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full max-h-[400px] overflow-y-auto">
+                <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2 sticky top-0 bg-white z-10 pb-2">
                     <Activity className="w-5 h-5 text-primary-600" /> Recent Activity
                 </h2>
                 <div className="space-y-4">
                     {data?.activity.length === 0 && <p className="text-sm text-gray-400">No recent activity found.</p>}
                     {data?.activity.map((item: any, i: number) => (
                         <div key={i} className="flex items-start gap-3 pb-3 border-b border-gray-50 last:border-0 last:pb-0">
-                            <div className={`p-2 rounded-full ${item.type === 'sale' ? 'bg-primary-50 text-primary-600' : 'bg-blue-50 text-blue-600'}`}>
-                                {item.type === 'sale' ? <DollarSign className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                            <div className={`p-2 rounded-full ${
+                                item.type === 'sale' ? 'bg-primary-50 text-primary-600' : 
+                                item.type === 'expense' ? 'bg-red-50 text-red-600' :
+                                'bg-blue-50 text-blue-600'
+                            }`}>
+                                {item.type === 'sale' ? <DollarSign className="w-4 h-4" /> : 
+                                 item.type === 'expense' ? <TrendingDown className="w-4 h-4" /> :
+                                 <CheckCircle className="w-4 h-4" />}
                             </div>
                             <div>
                                 <p className="text-sm font-semibold text-gray-800">{item.title}</p>
                                 <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
                                     <span>{new Date(item.date).toLocaleDateString()}</span>
                                     <span>•</span>
-                                    <span className={item.type === 'sale' ? 'text-primary-600 font-bold' : 'text-blue-500'}>{item.detail}</span>
+                                    <span className={`font-bold ${
+                                        item.type === 'sale' ? 'text-primary-600' : 
+                                        item.type === 'expense' ? 'text-red-600' : 
+                                        'text-blue-500'
+                                    }`}>
+                                        {item.detail}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -263,7 +288,7 @@ export default function Dashboard() {
                 <QuickAction href="/crops" title="Add Crop" color="bg-primary-50 text-primary-700 hover:bg-primary-100" icon={Sprout} />
                 <QuickAction href="/livestock" title="Add Animal" color="bg-yellow-50 text-yellow-700 hover:bg-yellow-100" icon={Users} />
                 <QuickAction href="/sales" title="Record Sale" color="bg-purple-50 text-purple-700 hover:bg-purple-100" icon={DollarSign} />
-                <QuickAction href="/inventory" title="Update Stock" color="bg-blue-50 text-blue-700 hover:bg-blue-100" icon={Package} />
+                <QuickAction href="/expenses" title="Record Expense" color="bg-orange-50 text-orange-700 hover:bg-orange-100" icon={TrendingDown} />
             </div>
           </div>
       </div>
@@ -279,7 +304,9 @@ function KpiCard({ title, value, icon: Icon, color }: any) {
     green: "bg-green-100 text-green-600", 
     yellow: "bg-yellow-100 text-yellow-600",
     purple: "bg-purple-100 text-purple-600",
-    blue: "bg-blue-100 text-blue-600"
+    blue: "bg-blue-100 text-blue-600",
+    orange: "bg-orange-100 text-orange-600",
+    red: "bg-red-100 text-red-600"
   };
   
   return (
