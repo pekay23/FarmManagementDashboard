@@ -7,66 +7,254 @@ import {
 } from 'recharts';
 import { 
   Sprout, PawPrint, DollarSign, CheckCircle, FileDown, Filter, 
-  ChevronDown, Layers, AlertCircle, Clock, Package, AlertTriangle, TrendingUp, HeartPulse 
+  ChevronDown, Layers, AlertCircle, Clock, Package, AlertTriangle, TrendingUp, HeartPulse, TrendingDown 
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { logoBase64 } from '@/lib/logo';
 import { addSvgToPdf } from '@/lib/pdfUtils'; 
+import { db } from '@/lib/db'; // Local DB
+import { toast } from 'sonner';
 
-const COLORS = ['#22c55e', '#eab308', '#3b82f6', '#f97316', '#ef4444', '#8b5cf6'];
+// Brand Colors: Primary Teal, plus supporting colors
+const COLORS = ['#14b8a6', '#f59e0b', '#3b82f6', '#f97316', '#ef4444', '#8b5cf6'];
 
 export default function Reports() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [reportType, setReportType] = useState('overview'); 
   const [period, setPeriod] = useState('month'); 
-  const [toast, setToast] = useState({ show: false, message: '' });
 
   useEffect(() => {
-    fetchReportData();
+    generateLocalReport();
   }, [reportType, period]);
 
-  async function fetchReportData() {
+  // --- LOCAL ANALYTICS ENGINE ---
+  async function generateLocalReport() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/reports?type=${reportType}&period=${period}`);
-      const json = await res.json();
-
-      // --- CRITICAL FIX: Convert strings to numbers ---
-      // Postgres/Neon often returns decimals as strings. Recharts Pie charts fail with strings.
-      if (json.charts) {
-        Object.keys(json.charts).forEach(key => {
-            if (Array.isArray(json.charts[key])) {
-                json.charts[key] = json.charts[key].map((item: any) => ({
-                    ...item,
-                    value: Number(item.value) || 0 // Force conversion
-                }));
-            }
-        });
+      let result: any = { kpi: {}, charts: {} };
+      const now = new Date();
+      
+      // Calculate Date Range
+      let startDate = new Date(0); // Default all time
+      if (period === 'month') {
+        startDate = new Date();
+        startDate.setDate(now.getDate() - 30);
+      } else if (period === 'year') {
+        startDate = new Date();
+        startDate.setFullYear(now.getFullYear() - 1);
       }
-      // -----------------------------------------------
 
-      setData(json);
+      // --- 1. OVERVIEW ---
+      if (reportType === 'overview') {
+        const [crops, animals, sales, tasks, expenses] = await Promise.all([
+            db.crops.toArray(),
+            db.livestock.toArray(),
+            db.sales.where('date').above(startDate.toISOString()).toArray(),
+            db.tasks.toArray(),
+            db.expenses.where('date').above(startDate.toISOString()).toArray()
+        ]);
+
+        const totalRevenue = sales.reduce((acc, s) => acc + (Number(s.amount) || 0), 0);
+        const totalExpense = expenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+        
+        const completedTasks = tasks.filter(t => t.status === 'Completed').length;
+        const completionRate = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
+
+        // Crop Distribution Chart
+        const cropDistMap: Record<string, number> = {};
+        crops.forEach(c => { cropDistMap[c.crop_type] = (cropDistMap[c.crop_type] || 0) + 1; });
+        const cropDist = Object.keys(cropDistMap).map(k => ({ name: k, value: cropDistMap[k] }));
+
+        // Sales Trend (Group by Day)
+        const salesMap: Record<string, number> = {};
+        sales.forEach(s => {
+            const dateStr = new Date(s.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+            salesMap[dateStr] = (salesMap[dateStr] || 0) + Number(s.amount);
+        });
+        const salesTrend = Object.keys(salesMap).map(k => ({ name: k, value: salesMap[k] })).slice(-7);
+
+        result.kpi = { 
+            net_profit: totalRevenue - totalExpense,
+            sales: totalRevenue, 
+            expenses: totalExpense, 
+            completion_rate: completionRate 
+        };
+        result.charts = { cropDist, salesTrend };
+      }
+
+      // --- 2. SALES ---
+      else if (reportType === 'sales') {
+        const sales = await db.sales.where('date').above(startDate.toISOString()).toArray();
+        
+        const totalRevenue = sales.reduce((acc, s) => acc + (Number(s.amount) || 0), 0);
+        const avgTicket = sales.length > 0 ? totalRevenue / sales.length : 0;
+
+        // Sales Trend
+        const salesMap: Record<string, number> = {};
+        sales.forEach(s => {
+            const d = new Date(s.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+            salesMap[d] = (salesMap[d] || 0) + Number(s.amount);
+        });
+        const salesTrend = Object.keys(salesMap).map(k => ({ name: k, value: salesMap[k] }));
+
+        // Top Items (Proxy via Customer Name)
+        const customerMap: Record<string, number> = {};
+        sales.forEach(s => {
+            const name = s.customer || 'Unknown';
+            customerMap[name] = (customerMap[name] || 0) + Number(s.amount);
+        });
+        const topItems = Object.keys(customerMap)
+            .map(k => ({ name: k, value: customerMap[k] }))
+            .sort((a,b) => b.value - a.value)
+            .slice(0, 5);
+
+        result.kpi = { total_revenue: totalRevenue, total_transactions: sales.length, avg_ticket: avgTicket };
+        result.charts = { salesTrend, topItems };
+      }
+
+      // --- 3. EXPENSES (NEW) ---
+      else if (reportType === 'expenses') {
+        const expenses = await db.expenses.where('date').above(startDate.toISOString()).toArray();
+        const totalExpense = expenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+        const avgExpense = expenses.length > 0 ? totalExpense / expenses.length : 0;
+
+        // Category Breakdown
+        const catMap: Record<string, number> = {};
+        expenses.forEach(e => {
+            const cat = e.category || 'Other';
+            catMap[cat] = (catMap[cat] || 0) + Number(e.amount);
+        });
+        const categoryDist = Object.keys(catMap).map(k => ({ name: k, value: catMap[k] }));
+
+        // Daily Trend
+        const expMap: Record<string, number> = {};
+        expenses.forEach(e => {
+            const d = new Date(e.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+            expMap[d] = (expMap[d] || 0) + Number(e.amount);
+        });
+        const expenseTrend = Object.keys(expMap).map(k => ({ name: k, value: expMap[k] }));
+
+        result.kpi = { 
+            total_expenses: totalExpense, 
+            count: expenses.length, 
+            avg_expense: avgExpense 
+        };
+        result.charts = { categoryDist, expenseTrend };
+      }
+
+      // --- 4. INVENTORY ---
+      else if (reportType === 'inventory') {
+        const items = await db.inventory.toArray();
+        const lowStock = items.filter(i => i.quantity <= i.lowStockThreshold).length;
+        const valuation = items.reduce((acc, i) => acc + (i.quantity * (i.unitPrice || 0)), 0);
+
+        // Value by Category
+        const catMap: Record<string, number> = {};
+        items.forEach(i => {
+            const val = i.quantity * (i.unitPrice || 0);
+            catMap[i.category] = (catMap[i.category] || 0) + val;
+        });
+        const categoryValue = Object.keys(catMap).map(k => ({ name: k, value: catMap[k] }));
+
+        // Stock Levels
+        const stockLevels = [...items]
+            .sort((a,b) => b.quantity - a.quantity)
+            .slice(0, 10)
+            .map(i => ({ name: i.name, value: i.quantity }));
+
+        result.kpi = { total_items: items.length, low_stock: lowStock, valuation };
+        result.charts = { stockLevels, categoryValue };
+      }
+
+      // --- 5. TASKS ---
+      else if (reportType === 'tasks') {
+        const tasks = await db.tasks.toArray();
+        const completed = tasks.filter(t => t.status === 'Completed').length;
+        const overdue = tasks.filter(t => t.status !== 'Completed' && new Date(t.dueDate) < new Date()).length;
+        
+        const priorityMap: Record<string, number> = {};
+        tasks.filter(t => t.status === 'Pending').forEach(t => {
+            priorityMap[t.priority] = (priorityMap[t.priority] || 0) + 1;
+        });
+        const priorityDist = Object.keys(priorityMap).map(k => ({ name: k, value: priorityMap[k] }));
+
+        result.kpi = { total: tasks.length, completed, overdue, pending: tasks.length - completed };
+        result.charts = { priorityDist, empPerformance: [] };
+      }
+
+      // --- 6. CROPS ---
+      else if (reportType === 'crops') {
+        const crops = await db.crops.toArray();
+        const harvested = crops.filter(c => c.status === 'Harvested').length;
+        const planted = crops.filter(c => c.status === 'Planted' || c.status === 'Growing').length;
+
+        // Yield Comp
+        const yieldMap: Record<string, {est: number, act: number}> = {};
+        crops.forEach(c => {
+            if(!yieldMap[c.crop_type]) yieldMap[c.crop_type] = {est: 0, act: 0};
+            yieldMap[c.crop_type].est += c.estimated_yield_kg || 0;
+            yieldMap[c.crop_type].act += c.actual_yield_kg || 0;
+        });
+        const yieldComparison = Object.keys(yieldMap).map(k => ({ 
+            name: k, 
+            estimated: yieldMap[k].est, 
+            actual: yieldMap[k].act 
+        }));
+
+        // Land Usage
+        const landMap: Record<string, number> = {};
+        crops.forEach(c => { landMap[c.crop_type] = (landMap[c.crop_type] || 0) + (c.plot_size_acres || 0); });
+        const landUsage = Object.keys(landMap).map(k => ({ name: k, value: landMap[k] }));
+
+        result.kpi = { total: crops.length, harvested, planted };
+        result.charts = { yieldComparison, landUsage };
+      }
+
+      // --- 7. LIVESTOCK ---
+      else if (reportType === 'livestock') {
+        const animals = await db.livestock.toArray();
+        const sick = animals.filter(a => a.health_status === 'Sick').length;
+        const sold = animals.filter(a => a.health_status === 'Sold').length;
+        
+        // FIXED: Safe Key Access Logic
+        const getDist = (field: keyof typeof animals[0]) => {
+            const map: Record<string, number> = {};
+            animals.forEach(a => { 
+                const val = a[field];
+                // Force string key safely
+                const key = val !== undefined && val !== null ? String(val) : 'Unknown';
+                map[key] = (map[key] || 0) + 1; 
+            });
+            return Object.keys(map).map(k => ({ name: k, value: map[k] }));
+        };
+
+        result.kpi = { total: animals.length, sick, sold, active: animals.length - sold };
+        result.charts = { 
+            speciesDist: getDist('species'), 
+            healthDist: getDist('health_status'), 
+            genderDist: getDist('sex') 
+        };
+      }
+
+      setData(result);
     } catch (e) { 
-        console.error(e); 
+        console.error("Report gen error", e); 
     } finally { 
         setLoading(false); 
     }
   }
 
-  const handleTypeChange = (e: any) => { setReportType(e.target.value); setData(null); setLoading(true); };
-  const handlePeriodChange = (e: any) => { setPeriod(e.target.value); setData(null); setLoading(true); };
-
-  function showNotification(message: string) {
-    setToast({ show: true, message });
-    setTimeout(() => setToast({ show: false, message: '' }), 3000);
-  }
+  const handleTypeChange = (e: any) => { setReportType(e.target.value); setData(null); };
+  const handlePeriodChange = (e: any) => { setPeriod(e.target.value); setData(null); };
 
   async function generatePDF() {
     if (!data) return;
     const doc = new jsPDF();
-    doc.setFillColor(34, 197, 94);
+    
+    // Header
+    doc.setFillColor(20, 184, 166); // Primary Teal
     doc.rect(0, 0, 210, 45, 'F');
     
     if (logoBase64) {
@@ -78,13 +266,19 @@ export default function Reports() {
     doc.setFontSize(22);
     doc.text(`${reportType.toUpperCase()} REPORT`, 105, 28, { align: "center" });
     
+    // KPI Table
     if (data.kpi) {
-        const kpiRows = Object.entries(data.kpi).map(([key, val]: any) => [key.replace(/_/g, ' ').toUpperCase(), val]);
-        autoTable(doc, { startY: 65, head: [['Metric', 'Value']], body: kpiRows });
+        const kpiRows = Object.entries(data.kpi).map(([key, val]: any) => [key.replace(/_/g, ' ').toUpperCase(), typeof val === 'number' ? val.toLocaleString() : val]);
+        autoTable(doc, { 
+            startY: 65, 
+            head: [['Metric', 'Value']], 
+            body: kpiRows,
+            headStyles: { fillColor: [20, 184, 166] }
+        });
     }
     
     doc.save(`${reportType}_Report.pdf`);
-    showNotification("Report downloaded successfully");
+    toast.success("Report downloaded successfully");
   }
 
   // --- DYNAMIC CONTENT RENDERERS ---
@@ -94,10 +288,18 @@ export default function Reports() {
         case 'overview':
             return (
                 <>
-                    <KpiCard title="Total Crops" value={data.kpi.crops || 0} sub="Active Fields" icon={Sprout} color="green" />
-                    <KpiCard title="Total Animals" value={data.kpi.animals || 0} sub="On Farm" icon={PawPrint} color="blue" />
-                    <KpiCard title="Total Sales" value={`GH₵ ${(data.kpi.sales || 0).toLocaleString()}`} sub="Revenue" icon={DollarSign} color="purple" />
-                    <KpiCard title="Task Completion" value={`${data.kpi.completion_rate || 0}%`} sub="Efficiency" icon={TrendingUp} color="orange" />
+                    <KpiCard title="Net Profit" value={`GH₵ ${data.kpi.net_profit.toLocaleString()}`} sub="Sales - Expenses" icon={DollarSign} color={data.kpi.net_profit >= 0 ? "green" : "red"} />
+                    <KpiCard title="Total Sales" value={`GH₵ ${data.kpi.sales.toLocaleString()}`} sub="Revenue" icon={TrendingUp} color="blue" />
+                    <KpiCard title="Total Expenses" value={`GH₵ ${data.kpi.expenses.toLocaleString()}`} sub="Costs" icon={TrendingDown} color="orange" />
+                    <KpiCard title="Task Completion" value={`${data.kpi.completion_rate || 0}%`} sub="Efficiency" icon={CheckCircle} color="teal" />
+                </>
+            );
+        case 'expenses':
+            return (
+                <>
+                    <KpiCard title="Total Expenses" value={`GH₵ ${data.kpi.total_expenses.toLocaleString()}`} icon={TrendingDown} color="red" />
+                    <KpiCard title="Transactions" value={data.kpi.count} icon={FileDown} color="blue" />
+                    <KpiCard title="Avg. Expense" value={`GH₵ ${Math.round(data.kpi.avg_expense).toLocaleString()}`} icon={DollarSign} color="orange" />
                 </>
             );
         case 'sales':
@@ -142,66 +344,75 @@ export default function Reports() {
                     <KpiCard title="Sold / Gone" value={data.kpi.sold || 0} icon={DollarSign} color="orange" />
                 </>
             );
-        default:
-            return null;
+        default: return null;
     }
   };
 
   const renderCharts = () => {
     if (!data?.charts) return null;
     const commonGrid = <CartesianGrid strokeDasharray="3 3" vertical={false} />;
-
+    
     switch (reportType) {
         case 'overview':
             return (
                 <>
-                    <ChartCard title="Sales Trend">
-                        {data.charts.salesTrend && data.charts.salesTrend.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={data.charts.salesTrend}>
-                                    <defs>
-                                        <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
-                                            <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                                        </linearGradient>
-                                    </defs>
-                                    {commonGrid}
-                                    <XAxis dataKey="name" fontSize={12} />
-                                    <YAxis fontSize={12} />
-                                    <Tooltip />
-                                    <Area type="monotone" dataKey="value" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorSales)" />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        ) : <div className="h-full flex items-center justify-center text-gray-400">No data</div>}
+                    <ChartCard title="Sales Trend (Last 7 Days)">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={data.charts.salesTrend || []}>
+                                <defs>
+                                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.8}/>
+                                        <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                {commonGrid}
+                                <XAxis dataKey="name" fontSize={12} />
+                                <YAxis fontSize={12} />
+                                <Tooltip />
+                                <Area type="monotone" dataKey="value" stroke="#0d9488" fillOpacity={1} fill="url(#colorSales)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
                     </ChartCard>
-
                     <ChartCard title="Crop Distribution">
-                        {data.charts.cropDist && data.charts.cropDist.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie 
-                                        data={data.charts.cropDist} 
-                                        cx="50%" 
-                                        cy="50%" 
-                                        innerRadius={60} 
-                                        outerRadius={80} 
-                                        fill="#8884d8" 
-                                        paddingAngle={5} 
-                                        dataKey="value"
-                                    >
-                                        {data.charts.cropDist.map((entry: any, index: number) => (
-                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip />
-                                    <Legend verticalAlign="bottom" height={36}/>
-                                </PieChart>
-                            </ResponsiveContainer>
-                        ) : <div className="h-full flex items-center justify-center text-gray-400">No crop data</div>}
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie data={data.charts.cropDist || []} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" dataKey="value">
+                                    {data.charts.cropDist?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                </Pie>
+                                <Tooltip />
+                                <Legend verticalAlign="bottom" height={36}/>
+                            </PieChart>
+                        </ResponsiveContainer>
                     </ChartCard>
                 </>
             );
-
+        case 'expenses':
+            return (
+                <>
+                    <ChartCard title="Expenses by Category">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie data={data.charts.categoryDist || []} cx="50%" cy="50%" outerRadius={80} fill="#ef4444" dataKey="value" label>
+                                    {data.charts.categoryDist?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                </Pie>
+                                <Tooltip />
+                                <Legend />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </ChartCard>
+                    <ChartCard title="Spending Trend">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={data.charts.expenseTrend || []}>
+                                {commonGrid}
+                                <XAxis dataKey="name" />
+                                <YAxis />
+                                <Tooltip cursor={{fill: 'transparent'}} />
+                                <Bar dataKey="value" name="Amount" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </ChartCard>
+                </>
+            );
         case 'sales':
             return (
                 <>
@@ -211,21 +422,21 @@ export default function Reports() {
                                 <AreaChart data={data.charts.salesTrend || []}>
                                     <defs>
                                         <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
-                                            <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                                            <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.8}/>
+                                            <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
                                         </linearGradient>
                                     </defs>
                                     {commonGrid}
                                     <XAxis dataKey="name" />
                                     <YAxis />
                                     <Tooltip />
-                                    <Area type="monotone" dataKey="value" name="Revenue" stroke="#22c55e" fill="url(#colorRev)" />
+                                    <Area type="monotone" dataKey="value" name="Revenue" stroke="#0d9488" fill="url(#colorRev)" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </ChartCard>
                     </div>
                     <div className="lg:col-span-2">
-                        <ChartCard title="Top Selling Products">
+                        <ChartCard title="Top Customers (Revenue)">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={data.charts.topItems || []} layout="vertical">
                                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
@@ -239,7 +450,6 @@ export default function Reports() {
                     </div>
                 </>
             );
-
         case 'inventory':
             return (
                 <>
@@ -267,27 +477,46 @@ export default function Reports() {
                     </ChartCard>
                 </>
             );
-
-        case 'tasks':
-            return (
+        case 'livestock':
+             return (
                 <>
-                    <ChartCard title="Employee Performance (Completed)">
+                    <ChartCard title="Species Distribution">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={data.charts.empPerformance || []}>
+                            <PieChart>
+                                <Pie data={data.charts.speciesDist || []} cx="50%" cy="50%" outerRadius={80} fill="#8884d8" dataKey="value" label>
+                                    {data.charts.speciesDist?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                </Pie>
+                                <Tooltip />
+                                <Legend />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </ChartCard>
+                    <ChartCard title="Health Status">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={data.charts.healthDist || []}>
                                 {commonGrid}
                                 <XAxis dataKey="name" />
                                 <YAxis allowDecimals={false} />
                                 <Tooltip cursor={{fill: 'transparent'}} />
-                                <Bar dataKey="value" name="Tasks" fill="#f97316" barSize={40} radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="value" name="Count" radius={[4, 4, 0, 0]}>
+                                    {data.charts.healthDist?.map((entry: any, index: number) => (
+                                        <Cell key={`cell-${index}`} fill={entry.name === 'Healthy' ? '#22c55e' : entry.name === 'Sick' ? '#ef4444' : '#eab308'} />
+                                    ))}
+                                </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </ChartCard>
+                </>
+             );
+        case 'tasks':
+             return (
+                <>
                     <ChartCard title="Pending Tasks by Priority">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie data={data.charts.priorityDist || []} cx="50%" cy="50%" outerRadius={80} fill="#8884d8" dataKey="value" label>
                                     {data.charts.priorityDist?.map((entry: any, index: number) => (
-                                        <Cell key={`cell-${index}`} fill={entry.name === 'high' ? '#ef4444' : entry.name === 'medium' ? '#eab308' : '#3b82f6'} />
+                                        <Cell key={`cell-${index}`} fill={entry.name === 'High' ? '#ef4444' : entry.name === 'Medium' ? '#eab308' : '#3b82f6'} />
                                     ))}
                                 </Pie>
                                 <Tooltip />
@@ -296,10 +525,9 @@ export default function Reports() {
                         </ResponsiveContainer>
                     </ChartCard>
                 </>
-            );
-
+             );
         case 'crops':
-            return (
+             return (
                 <>
                     <ChartCard title="Yield Estimates vs Actuals">
                         <ResponsiveContainer width="100%" height="100%">
@@ -326,100 +554,49 @@ export default function Reports() {
                         </ResponsiveContainer>
                     </ChartCard>
                 </>
-            );
-
-        case 'livestock':
-            return (
-                <>
-                    <ChartCard title="Species Distribution">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie data={data.charts.speciesDist || []} cx="50%" cy="50%" outerRadius={80} fill="#8884d8" dataKey="value" label>
-                                    {data.charts.speciesDist?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                                </Pie>
-                                <Tooltip />
-                                <Legend />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </ChartCard>
-                    <ChartCard title="Health Status">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={data.charts.healthDist || []}>
-                                {commonGrid}
-                                <XAxis dataKey="name" />
-                                <YAxis allowDecimals={false} />
-                                <Tooltip cursor={{fill: 'transparent'}} />
-                                <Bar dataKey="value" name="Count" fill="#ef4444" radius={[4, 4, 0, 0]}>
-                                    {data.charts.healthDist?.map((entry: any, index: number) => (
-                                        <Cell key={`cell-${index}`} fill={entry.name === 'Healthy' ? '#22c55e' : entry.name === 'Sick' ? '#ef4444' : '#eab308'} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </ChartCard>
-                    <div className="lg:col-span-2">
-                        <ChartCard title="Gender Distribution">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={data.charts.genderDist || []} layout="vertical" margin={{ left: 20 }}>
-                                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                                    <XAxis type="number" />
-                                    <YAxis dataKey="name" type="category" width={80} />
-                                    <Tooltip cursor={{fill: 'transparent'}} />
-                                    <Bar dataKey="value" name="Count" fill="#3b82f6" barSize={30} radius={[0, 4, 4, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </ChartCard>
-                    </div>
-                </>
-            );
-        default:
-            return null;
+             );
+        default: return null;
     }
   };
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto min-h-screen relative">
+    <div className="p-4 md:p-8 max-w-[1600px] mx-auto min-h-screen relative pb-20">
       
-      {toast.show && (
-        <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 animate-bounce z-50">
-            <CheckCircle className="w-4 h-4 text-green-400" />
-            <p className="text-sm">{toast.message}</p>
-        </div>
-      )}
-
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
           <p className="text-gray-500">Analyze your farm performance</p>
         </div>
         
-        <div className="flex gap-3">
-            <div className="relative">
-                <select className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-green-500 shadow-sm" value={period} onChange={handlePeriodChange}>
+        <div className="flex gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:flex-none">
+                <select className="appearance-none w-full bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-primary-500 shadow-sm cursor-pointer" value={period} onChange={handlePeriodChange}>
                     <option value="month">This Month</option>
                     <option value="year">This Year</option>
                     <option value="all">All Time</option>
                 </select>
                 <ChevronDown className="w-4 h-4 text-gray-500 absolute right-3 top-3 pointer-events-none" />
             </div>
-            <div className="relative">
-                <select className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-green-500 font-bold shadow-sm" value={reportType} onChange={handleTypeChange}>
-                    <option value="overview">Overview Report</option>
-                    <option value="sales">Sales Report</option>
-                    <option value="inventory">Inventory Report</option>
-                    <option value="crops">Crop Report</option>
-                    <option value="livestock">Livestock Report</option>
-                    <option value="tasks">Task Report</option>
+            <div className="relative flex-1 md:flex-none">
+                <select className="appearance-none w-full bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-primary-500 font-bold shadow-sm cursor-pointer" value={reportType} onChange={handleTypeChange}>
+                    <option value="overview">Overview</option>
+                    <option value="sales">Sales</option>
+                    <option value="expenses">Expenses</option>
+                    <option value="inventory">Inventory</option>
+                    <option value="crops">Crops</option>
+                    <option value="livestock">Livestock</option>
+                    <option value="tasks">Tasks</option>
                 </select>
                 <Filter className="w-4 h-4 text-gray-500 absolute right-3 top-3 pointer-events-none" />
             </div>
-            <button onClick={generatePDF} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors shadow-lg shadow-green-200">
-                <FileDown className="w-4 h-4" /> Generate PDF
+            <button onClick={generatePDF} className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors shadow-lg shadow-primary-200">
+                <FileDown className="w-4 h-4" /> <span className="hidden md:inline">PDF</span>
             </button>
         </div>
       </div>
 
-      {loading || !data ? <div className="text-center py-20 text-gray-400">Loading data...</div> : (
+      {loading ? <div className="text-center py-20 text-gray-400">Processing data...</div> : (
         <>
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
                 {renderKPIs()}
@@ -439,7 +616,8 @@ function KpiCard({ title, value, sub, icon: Icon, color }: any) {
         blue: "bg-blue-50 text-blue-600", 
         purple: "bg-purple-50 text-purple-600", 
         orange: "bg-orange-50 text-orange-600",
-        red: "bg-red-50 text-red-600"
+        red: "bg-red-50 text-red-600",
+        teal: "bg-primary-50 text-primary-600"
     };
     
     return (
@@ -447,9 +625,9 @@ function KpiCard({ title, value, sub, icon: Icon, color }: any) {
             <div>
                 <p className="text-sm font-bold text-gray-500 mb-1">{title}</p>
                 <h3 className="text-3xl font-bold text-gray-900">{value}</h3>
-                {sub && <p className={`text-xs mt-2 font-medium ${sub.includes('+') ? 'text-green-600' : 'text-orange-500'}`}>{sub}</p>}
+                {sub && <p className={`text-xs mt-2 font-medium ${sub.includes('Attention') || sub.includes('Urgent') ? 'text-red-500' : 'text-primary-600'}`}>{sub}</p>}
             </div>
-            <div className={`p-3 rounded-lg ${colors[color]}`}>
+            <div className={`p-3 rounded-lg ${colors[color] || colors.teal}`}>
                 <Icon className="w-6 h-6" />
             </div>
         </div>

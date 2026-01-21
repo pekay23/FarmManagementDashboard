@@ -1,7 +1,9 @@
 import jsPDF from 'jspdf';
 import { Canvg } from 'canvg';
 
-// This is our new function to add SVG images to a PDF
+/**
+ * Adds an SVG string to a jsPDF document by first converting it to a high-res PNG canvas.
+ */
 export async function addSvgToPdf(
   doc: jsPDF, 
   svgString: string, 
@@ -10,18 +12,32 @@ export async function addSvgToPdf(
   width: number, 
   height: number
 ) {
-  // Create a virtual canvas to draw on
+  // Create a virtual canvas
   const canvas = document.createElement('canvas');
+  
+  // Set canvas size (Scale up by 3x for high DPI print quality)
+  const scale = 3; 
+  canvas.width = width * scale * 3.78; // Approx conversion factor for mm to pixels
+  canvas.height = height * scale * 3.78;
+
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  // Use canvg to render the SVG onto the canvas
-  const v = await Canvg.from(ctx, svgString);
-  await v.render();
+  // Render SVG to Canvas
+  try {
+    const v = await Canvg.from(ctx, svgString);
+    
+    // Resize the SVG rendering to fit our scaled canvas
+    v.resize(canvas.width, canvas.height);
+    
+    await v.render();
 
-  // Get the image data from the canvas
-  const imgData = canvas.toDataURL('image/png');
-  
-  // Add the resulting PNG data to the PDF
-  doc.addImage(imgData, 'PNG', x, y, width, height);
+    // Get PNG data
+    const imgData = canvas.toDataURL('image/png');
+    
+    // Add to PDF
+    doc.addImage(imgData, 'PNG', x, y, width, height);
+  } catch (e) {
+    console.error("Failed to render SVG to PDF", e);
+  }
 }

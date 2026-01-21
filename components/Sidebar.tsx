@@ -1,97 +1,98 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { signOut } from 'next-auth/react';
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import SyncStatus from "@/components/SyncStatus";
+import { logoBase64 } from "@/lib/logo";
 import { 
-  LayoutDashboard, Sprout, Cat, Package, ShoppingCart, 
-  Users, FileText, LogOut, Settings 
-} from 'lucide-react';
-import { logoBase64 } from '@/lib/logo';
-
-const menuItems = [
-  { name: 'Dashboard', icon: LayoutDashboard, href: '/' },
-  { name: 'Crop Management', icon: Sprout, href: '/crops' },
-  { name: 'Livestock', icon: Cat, href: '/livestock' },
-  { name: 'Inventory', icon: Package, href: '/inventory' },
-  { name: 'Sales & Receipts', icon: ShoppingCart, href: '/sales' },
-  { name: 'Employees & Tasks', icon: Users, href: '/employees' },
-  { name: 'Reports', icon: FileText, href: '/reports' },
-  { name: 'Profile', icon: Settings, href: '/profile' },
-];
+  Menu, X, Home, Tractor, Settings, Beef, Package, 
+  Users, ClipboardList, DollarSign, BarChart3, TrendingDown 
+} from "lucide-react";
 
 export default function Sidebar() {
+  const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
 
-  if (pathname === '/login') return null;
+  const links = [
+    { name: "Dashboard", href: "/", icon: Home },
+    { name: "Livestock", href: "/livestock", icon: Beef },
+    { name: "Crops", href: "/crops", icon: Tractor },
+    { name: "Inventory", href: "/inventory", icon: Package },
+    { name: "Employees", href: "/employees", icon: Users },
+    { name: "Tasks", href: "/tasks", icon: ClipboardList },
+    { name: "Expenses", href: "/expenses", icon: TrendingDown },
+    { name: "Sales", href: "/sales", icon: DollarSign },
+    { name: "Reports", href: "/reports", icon: BarChart3 },
+    { name: "Settings", href: "/settings", icon: Settings },
+  ];
 
   return (
     <>
-      {/* Modern Scrollbar Styles applied only to this component */}
-      <style jsx global>{`
-        .modern-scrollbar::-webkit-scrollbar {
-          width: 5px;
-        }
-        .modern-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .modern-scrollbar::-webkit-scrollbar-thumb {
-          background-color: rgba(255, 255, 255, 0.1);
-          border-radius: 20px;
-        }
-        .modern-scrollbar::-webkit-scrollbar-thumb:hover {
-          background-color: rgba(255, 255, 255, 0.3);
-        }
-      `}</style>
+      {/* Mobile Header */}
+      <div className="md:hidden fixed top-0 left-0 w-full bg-emerald-900 z-50 p-4 border-b border-white/10 flex justify-between items-center text-white shadow-md">
+        <div className="flex items-center gap-3">
+            <img src={logoBase64} alt="Logo" className="w-8 h-8 object-contain drop-shadow-md" />
+            <span className="font-bold text-lg tracking-wide">Hughes Farms</span>
+        </div>
+        <button onClick={() => setIsOpen(!isOpen)} className="p-1 hover:bg-white/10 rounded-md">
+            {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+      </div>
 
-      <div className="h-screen w-64 bg-green-900 text-white fixed left-0 top-0 flex flex-col z-50 shadow-2xl">
-        {/* --- LOGO SECTION --- */}
-        <div className="p-4 flex items-center space-x-3 border-b border-green-800/50">
-          <div className="w-16 h-16 flex items-center justify-center shrink-0">
+      {/* Sidebar Container */}
+      <aside 
+        className={`fixed top-0 left-0 h-full bg-gradient-to-b from-emerald-900 to-teal-900 text-white transition-transform duration-300 z-40 w-64 flex flex-col shadow-2xl
+        ${isOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 pt-20 md:pt-0`}
+      >
+        {/* Brand Section - Compact Height to match Dashboard Header */}
+        <div className="flex items-center gap-3 px-6 py-6 border-b border-white/10 bg-emerald-950/20">
+           <div className="bg-white/10 p-2 rounded-xl backdrop-blur-sm shadow-sm border border-white/5">
              <img 
-               src={logoBase64}
-               alt="Hughes Farms" 
-               className="w-full h-full object-contain"
+               src={logoBase64} 
+               className="w-10 h-10 object-contain drop-shadow-md" 
+               alt="Hughes Farms Logo"
              />
-          </div>
-          <div>
-            <h1 className="text-xl font-extrabold leading-tight tracking-tight">Hughes Farms</h1>
-            <p className="text-[10px] text-green-300 font-medium opacity-80">Farm Management</p>
-          </div>
+           </div>
+           <div>
+             <h1 className="font-bold text-lg leading-tight tracking-wide text-white">Hughes<br/>Farms</h1>
+           </div>
         </div>
 
-        {/* --- NAVIGATION (Now using modern-scrollbar class) --- */}
-        <nav className="flex-1 px-3 space-y-1 mt-4 overflow-y-auto modern-scrollbar">
-          {menuItems.map((item) => {
-            const isActive = pathname === item.href;
+        {/* Navigation Links - Scrollbar Hidden */}
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5 
+          [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          
+          {links.map((link) => {
+            const isActive = pathname === link.href;
             return (
-              <Link key={item.name} href={item.href} className={`flex items-center space-x-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all duration-200 ${isActive ? 'bg-white/10 text-white shadow-inner' : 'text-green-100/80 hover:bg-white/5 hover:text-white'}`}>
-                <item.icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-yellow-400' : ''}`} />
-                <span>{item.name}</span>
+              <Link 
+                key={link.name} 
+                href={link.href} 
+                onClick={() => setIsOpen(false)} 
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium ${
+                  isActive 
+                    ? "bg-white text-emerald-900 shadow-lg font-bold translate-x-1" 
+                    : "text-emerald-100/80 hover:bg-white/10 hover:text-white hover:translate-x-1"
+                }`}
+              >
+                <link.icon className={`w-5 h-5 ${isActive ? "text-emerald-700" : "text-emerald-200/70"}`} />
+                {link.name}
               </Link>
             );
           })}
         </nav>
 
-        {/* --- LOGOUT & FOOTER --- */}
-        <div className="p-3 border-t border-green-800/50">
-          <button 
-            onClick={() => signOut({ redirect: true, callbackUrl: '/login' })}
-            className="flex w-full items-center space-x-3 px-4 py-3 text-sm font-semibold rounded-lg text-red-300 hover:bg-red-900/30 hover:text-red-200 transition-all duration-200 mb-2"
-          >
-            <LogOut className="w-5 h-5 shrink-0" />
-            <span>Sign Out</span>
-          </button>
-
-          <div className="px-4 text-xs text-green-300/60">
-              <p className="font-medium">Version 1.0.0</p>
-              <div className="flex items-center mt-1">
-                  <span className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></span>
-                  Online Mode
-              </div>
-          </div>
+        {/* Sync Status Footer */}
+        <div className="p-4 bg-black/20 border-t border-white/5">
+            <SyncStatus />
         </div>
-      </div>
+      </aside>
+
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-sm" onClick={() => setIsOpen(false)} />
+      )}
     </>
   );
 }

@@ -1,19 +1,24 @@
 import { NextResponse } from 'next/server';
-import sql from '@/lib/db';
+import pool from '@/lib/pg'; // Use the Server DB connection
 
 // DELETE ITEM
 export async function DELETE(
   request: Request,
   props: { params: Promise<{ id: string }> }
 ) {
+  const client = await pool.connect();
   try {
-    const params = await props.params; // Await the params first
+    const params = await props.params; // Await the params
     const id = params.id;
     
-    await sql`DELETE FROM inventory WHERE id = ${id}`;
+    await client.query('DELETE FROM inventory WHERE id = $1', [id]);
+    
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error('Delete inventory error:', error);
     return NextResponse.json({ error: 'Failed to delete item' }, { status: 500 });
+  } finally {
+    client.release();
   }
 }
 
@@ -22,6 +27,7 @@ export async function PUT(
   request: Request,
   props: { params: Promise<{ id: string }> }
 ) {
+  const client = await pool.connect();
   try {
     const params = await props.params;
     const id = params.id;
@@ -29,22 +35,29 @@ export async function PUT(
     const body = await request.json();
     const { name, category, quantity, unit, threshold, price, supplier } = body;
 
-    const updatedItem = await sql`
+    const query = `
       UPDATE inventory 
-      SET item_name = ${name}, 
-          category = ${category}, 
-          quantity = ${quantity}, 
-          unit = ${unit}, 
-          min_threshold = ${threshold}, 
-          unit_price = ${price}, 
-          supplier = ${supplier},
-          last_updated = CURRENT_TIMESTAMP  -- This updates the date automatically
-      WHERE id = ${id}
+      SET item_name = $1, 
+          category = $2, 
+          quantity = $3, 
+          unit = $4, 
+          min_threshold = $5, 
+          unit_price = $6, 
+          supplier = $7,
+          last_updated = CURRENT_TIMESTAMP
+      WHERE id = $8
       RETURNING *
     `;
 
-    return NextResponse.json(updatedItem[0]);
+    const values = [name, category, quantity, unit, threshold, price, supplier, id];
+    
+    const result = await client.query(query, values);
+    
+    return NextResponse.json(result.rows[0]);
   } catch (error) {
+    console.error('Update inventory error:', error);
     return NextResponse.json({ error: 'Failed to update item' }, { status: 500 });
+  } finally {
+    client.release();
   }
 }
