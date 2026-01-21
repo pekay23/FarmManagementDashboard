@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth";
 import { hash } from "bcryptjs";
 import { Pool } from 'pg';
-import { authOptions } from "../[...nextauth]/route"; // Import your auth config
+import { authOptions } from "@/lib/auth"; 
 
 // 1. SSL for Neon
 const pool = new Pool({ 
