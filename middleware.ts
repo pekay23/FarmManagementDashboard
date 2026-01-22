@@ -10,14 +10,14 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - login (Login page)
-     * - api (API routes - handled separately or public)
-     * - _next/static (Static files)
-     * - _next/image (Image optimization files)
-     * - favicon.ico, site.webmanifest (PWA Metadata)
-     * - sw.js, workbox (PWA Service Worker)
-     * - File extensions: .png, .jpg, .svg (Static Images)
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico, site.webmanifest (PWA files)
+     * - sw.js, workbox-*.js (Service Workers)
+     * - login (Login page - excluded to prevent loops)
+     * - Public images (svg, png, jpg)
      */
-    "/((?!login|api|_next/static|_next/image|favicon.ico|site.webmanifest|sw.js|workbox-.*|.*\\.png|.*\\.svg|.*\\.jpg).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|site.webmanifest|sw.js|workbox-.*|login|.*\\.png$|.*\\.jpg$|.*\\.svg$).*)",
   ],
 };

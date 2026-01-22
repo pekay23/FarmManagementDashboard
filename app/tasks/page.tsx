@@ -33,7 +33,9 @@ export default function TasksPage() {
         .map((option: any) => option.value);
 
     try {
+        // GENERATE UUID HERE
         await db.tasks.add({
+            id: crypto.randomUUID(), 
             title,
             description,
             priority,
@@ -41,7 +43,8 @@ export default function TasksPage() {
             assignedTo: selected.join(','),
             status: 'Pending',
             syncStatus: 'pending',
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString() // Ensure updatedAt is also set
         } as any);
         toast.success("Task created");
         setIsModalOpen(false);
@@ -52,17 +55,28 @@ export default function TasksPage() {
 
   async function toggleStatus(task: any) {
       const newStatus = task.status === 'Completed' ? 'Pending' : 'Completed';
-      await db.tasks.update(task.id, { status: newStatus, syncStatus: 'updated' });
+      await db.tasks.update(task.id, { 
+          status: newStatus, 
+          syncStatus: 'updated',
+          updatedAt: new Date().toISOString()
+      });
   }
 
-  async function deleteTask(id: number) {
+  async function deleteTask(id: string) { // Updated type to string
       if(confirm("Delete this task?")) {
-          await db.tasks.delete(id);
+          // If it's a pending item (never synced), just delete it
+          // If it's a synced item, mark as deleted for sync
+          const task = await db.tasks.get(id);
+          if (task && task.syncStatus === 'pending') {
+             await db.tasks.delete(id);
+          } else {
+             await db.tasks.update(id, { syncStatus: 'deleted', updatedAt: new Date().toISOString() });
+          }
           toast.success("Task deleted");
       }
   }
 
-  const filteredTasks = tasks.filter(t => filter === 'All' ? true : t.status === filter);
+  const filteredTasks = tasks.filter(t => t.syncStatus !== 'deleted' && (filter === 'All' ? true : t.status === filter));
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto pb-20">

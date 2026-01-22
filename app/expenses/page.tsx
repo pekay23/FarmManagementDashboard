@@ -27,11 +27,16 @@ export default function ExpensesPage() {
         date: e.target.date.value,
         notes: e.target.notes.value,
         createdAt: new Date().toISOString(),
-        syncStatus: 'pending'
+        syncStatus: 'pending',
+        updatedAt: new Date().toISOString()
     };
 
     try {
-        await db.expenses.add(formData as any);
+        // GENERATE UUID HERE
+        await db.expenses.add({
+            id: crypto.randomUUID(), 
+            ...formData
+        } as any);
         toast.success("Expense recorded");
         setIsModalOpen(false);
     } catch (err) {

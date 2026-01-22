@@ -20,11 +20,10 @@ export default function EmployeeTaskManagement() {
   // Custom State for Checkbox Multi-Select
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   
-  // Delete Confirmation
-  const [confirmDelete, setConfirmDelete] = useState<{ show: boolean, type: string, id: number | null }>({ show: false, type: '', id: null });
+  // Delete Confirmation (Updated id to string for UUIDs)
+  const [confirmDelete, setConfirmDelete] = useState<{ show: boolean, type: string, id: string | null }>({ show: false, type: '', id: null });
 
   // --- ACTIONS (Offline First) ---
-
   async function handleSaveEmployee(e: any) {
     e.preventDefault();
     const formData = {
@@ -40,7 +39,9 @@ export default function EmployeeTaskManagement() {
             await db.employees.update(editingItem.id, { ...formData, syncStatus: 'updated' });
             toast.success("Employee updated");
         } else {
+            // GENERATE UUID HERE
             await db.employees.add({ 
+                id: crypto.randomUUID(), 
                 ...formData, 
                 createdAt: new Date().toISOString(),
                 syncStatus: 'pending' 
@@ -74,7 +75,9 @@ export default function EmployeeTaskManagement() {
             });
             toast.success("Task updated");
         } else {
+            // GENERATE UUID HERE
             await db.tasks.add({ 
+                id: crypto.randomUUID(),
                 ...formData, 
                 createdAt: new Date().toISOString(),
                 syncStatus: 'pending' 

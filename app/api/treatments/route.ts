@@ -1,17 +1,27 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/pg'; // Server DB connection
 
-// GET treatments for a specific crop (pass ?crop_id=XYZ)
+export const dynamic = 'force-dynamic'; // Ensure fresh data
+
+// GET treatments
+// If ?crop_id=ALL or no crop_id is provided, return ALL treatments (for Sync)
+// If ?crop_id=UUID is provided, return treatments for that specific crop
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const crop_id = searchParams.get('crop_id');
 
-  if (!crop_id) return NextResponse.json([], { status: 200 });
-
   const client = await pool.connect();
   try {
-    const query = 'SELECT * FROM crop_treatments WHERE crop_id = $1 ORDER BY treatment_date DESC';
-    const result = await client.query(query, [crop_id]);
+    let query = 'SELECT * FROM crop_treatments ORDER BY treatment_date DESC';
+    let values: any[] = [];
+
+    // Only filter if crop_id is provided AND it's not "ALL"
+    if (crop_id && crop_id !== 'ALL') {
+        query = 'SELECT * FROM crop_treatments WHERE crop_id = $1 ORDER BY treatment_date DESC';
+        values = [crop_id];
+    }
+
+    const result = await client.query(query, values);
     return NextResponse.json(result.rows);
   } catch (error) {
     console.error('Fetch treatments error:', error);

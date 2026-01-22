@@ -11,7 +11,13 @@ import {
 
 export default function Inventory() {
   // 1. REAL-TIME DATA
-  const items = useLiveQuery(() => db.inventory.toArray().then(rows => rows.reverse())) || [];
+  // Filter out deleted items locally so they disappear immediately from UI
+  const items = useLiveQuery(() => 
+    db.inventory
+      .filter(i => i.syncStatus !== 'deleted')
+      .reverse()
+      .toArray()
+  ) || [];
   
   const [activeCategory, setActiveCategory] = useState('All');
   
@@ -28,12 +34,7 @@ export default function Inventory() {
         category: e.target.category.value,
         quantity: parseFloat(e.target.quantity.value),
         unit: e.target.unit.value,
-        lowStockThreshold: parseFloat(e.target.threshold.value), // Mapped to correct field
-        unit_price: parseFloat(e.target.price.value), // Mapped to correct field? No, wait. 
-        // Let's check DB schema. 'InventoryItem' has 'lowStockThreshold'. 
-        // It does NOT have 'unit_price' or 'supplier' in the interface I gave you earlier.
-        // We should add them to the interface if you need them.
-        // For now, I will add them to the object, Dexie will store them even if not in TS interface (it's flexible).
+        lowStockThreshold: parseFloat(e.target.threshold.value),
         unitPrice: parseFloat(e.target.price.value),
         supplier: e.target.supplier.value,
         updatedAt: new Date().toISOString()
@@ -44,7 +45,9 @@ export default function Inventory() {
             await db.inventory.update(editingItem.id, { ...formData, syncStatus: 'updated' });
             toast.success("Item updated");
         } else {
+            // GENERATE UUID HERE
             await db.inventory.add({ 
+                id: crypto.randomUUID(), 
                 ...formData, 
                 createdAt: new Date().toISOString(),
                 syncStatus: 'pending' 
@@ -57,10 +60,17 @@ export default function Inventory() {
     }
   }
 
-  async function handleDelete(id: number) {
+  async function handleDelete(id: string) {
     if (!confirm('Are you sure?')) return;
     try {
-        await db.inventory.delete(id);
+        const item = await db.inventory.get(id);
+        // If it was never synced, just delete it locally
+        if (item && item.syncStatus === 'pending') {
+            await db.inventory.delete(id);
+        } else {
+            // Otherwise mark for deletion so sync picks it up
+            await db.inventory.update(id, { syncStatus: 'deleted', updatedAt: new Date().toISOString() });
+        }
         toast.success("Item deleted");
     } catch (err) {
         toast.error("Delete failed");
@@ -72,7 +82,6 @@ export default function Inventory() {
   
   const filteredItems = items.filter(item => {
     if (activeCategory === 'All') return true;
-    // Note: Dexie returns numbers as numbers, so no need for 'Number()' cast usually, but safe to keep
     if (activeCategory === 'Low Stock') return item.quantity <= item.lowStockThreshold;
     return item.category === activeCategory;
   });

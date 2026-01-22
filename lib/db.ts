@@ -1,53 +1,43 @@
 import Dexie, { Table } from 'dexie';
 
-// 1. Base interface
+// --- BASE INTERFACE ---
 export interface Syncable {
-  id?: number;
-  syncStatus: 'synced' | 'pending' | 'updated';
-  createdAt?: string;
-  updatedAt?: string;
+  id: string; // UUID generated client-side
+  syncStatus: 'synced' | 'pending' | 'updated' | 'deleted';
+  createdAt: string; // ISO timestamp
+  updatedAt: string; // ISO timestamp
 }
 
-// 2. New Expense Interface
-export interface Expense extends Syncable {
+// --- ENTITY INTERFACES ---
+export interface Employee extends Syncable {
+  name: string;
+  role?: string;
+  phone?: string;
+  isActive: boolean;
+}
+
+export interface Task extends Syncable {
   title: string;
-  amount: number;
-  category: 'Seeds' | 'Fertilizer' | 'Labor' | 'Fuel' | 'Maintenance' | 'Other';
-  date: string;
-  notes?: string;
+  description?: string;
+  assignedTo: string;
+  dueDate?: string;
+  priority?: string;
+  category?: string;
+  status: string;
 }
 
-// ... (Keep existing interfaces for Crop, Livestock, etc.) ...
 export interface Crop extends Syncable {
   plot_number: string;
   crop_type: string;
+  status: string;
+  location: string;
   variety?: string;
   planting_date: string;
   expected_harvest_date?: string;
-  plot_size_acres: number;
-  location: string;
-  estimated_yield_kg: number;
+  plot_size_acres?: number;
+  estimated_yield_kg?: number;
   actual_yield_kg?: number;
   harvest_notes?: string;
-  status: 'Planted' | 'Growing' | 'Harvested' | 'Failed';
-}
-
-export interface Livestock extends Syncable {
-  animal_id: string;       
-  species: string;         
-  breed: string;
-  sex: 'Male' | 'Female';  
-  date_of_birth: string;   
-  current_weight_kg: number; 
-  health_status: 'Healthy' | 'Sick' | 'Sold' | 'Deceased'; 
-}
-
-export interface LivestockLog extends Syncable {
-  livestock_id: number;
-  type: 'vaccine' | 'treatment' | 'weight';
-  date: string;
-  data: any;
-  notes?: string;
 }
 
 export interface InventoryItem extends Syncable {
@@ -56,70 +46,82 @@ export interface InventoryItem extends Syncable {
   quantity: number;
   unit: string;
   lowStockThreshold: number;
-  unitPrice?: number; 
-  supplier?: string;  
-}
-
-export interface Task extends Syncable {
-  title: string;
-  description?: string;
-  assignedTo?: string; 
-  dueDate: string;
-  status: 'Pending' | 'In Progress' | 'Completed';
-  priority: 'Low' | 'Medium' | 'High';
+  unitPrice: number;
+  supplier?: string;
 }
 
 export interface Sale extends Syncable {
-  customer: string; // Changed from 'buyer_name' to standardize
-  amount: number;   // Changed from 'total_amount'
   date: string;
-  itemsData: any[]; // Store the items JSON
+  customer?: string;
+  amount?: number;
   contact_info?: string;
+  itemsData?: any[]; // JSON array
 }
 
-export interface Employee extends Syncable {
-  name: string;
-  role: string;
-  phone?: string;
-  isActive: boolean;
-}
-
-export interface Treatment extends Syncable {
-  crop_id: number;
-  treatment_type: string;
-  product_name: string;
-  treatment_date: string;
-  quantity: string;
-  cost: number;
+export interface Expense extends Syncable {
+  title: string;
+  category: string;
+  date: string;
+  amount?: number;
   notes?: string;
 }
 
-// 3. Database Class
-class FarmDatabase extends Dexie {
-  livestock!: Table<Livestock>;
-  livestock_logs!: Table<LivestockLog>;
-  crops!: Table<Crop>;
-  inventory!: Table<InventoryItem>;
-  tasks!: Table<Task>;
-  sales!: Table<Sale>;
-  employees!: Table<Employee>;
-  treatments!: Table<Treatment>;
-  expenses!: Table<Expense>; // <--- New Table
+export interface Livestock extends Syncable {
+  animal_id: string;
+  species: string;
+  breed?: string;
+  sex?: string;
+  date_of_birth?: string;
+  current_weight_kg?: number;
+  health_status: string;
+}
+
+export interface LivestockLog extends Syncable {
+  livestock_id: string;
+  type: string;
+  date: string;
+  data: any; // JSON object for details
+}
+
+export interface Treatment extends Syncable {
+  crop_id: string;
+  treatment_type: string;
+  product_name: string;
+  treatment_date: string;
+  quantity?: string;
+  cost?: number;
+  notes?: string;
+}
+
+// --- DATABASE CLASS ---
+export class FarmDatabase extends Dexie {
+  employees!: Table<Employee, string>;
+  tasks!: Table<Task, string>;
+  crops!: Table<Crop, string>;
+  inventory!: Table<InventoryItem, string>;
+  sales!: Table<Sale, string>;
+  expenses!: Table<Expense, string>;
+  livestock!: Table<Livestock, string>;
+  livestock_logs!: Table<LivestockLog, string>;
+  treatments!: Table<Treatment, string>;
 
   constructor() {
-    super('HughesFarmDB');
+    // CHANGED NAME TO 'HughesFarmDB_v2' TO FORCE RESET
+    super('HughesFarmDB_v2');
+
     this.version(1).stores({
-      livestock: '++id, animal_id, species, health_status, syncStatus',
-      livestock_logs: '++id, livestock_id, type, date, syncStatus',
-      crops: '++id, plot_number, crop_type, status, location, syncStatus',
-      inventory: '++id, name, category, quantity, syncStatus',
-      tasks: '++id, status, priority, assignedTo, syncStatus',
-      sales: '++id, date, syncStatus',
-      employees: '++id, name, isActive, syncStatus',
-      treatments: '++id, crop_id, treatment_date, syncStatus',
-      expenses: '++id, category, date, syncStatus' // <--- New Schema
+      employees: 'id, name, role, phone, isActive, syncStatus, createdAt, updatedAt',
+      tasks: 'id, title, status, priority, assignedTo, dueDate, syncStatus, createdAt, updatedAt',
+      crops: 'id, plot_number, crop_type, status, location, planting_date, syncStatus, createdAt, updatedAt',
+      inventory: 'id, name, category, quantity, lowStockThreshold, syncStatus, createdAt, updatedAt',
+      sales: 'id, date, customer, amount, syncStatus, createdAt, updatedAt',
+      expenses: 'id, title, category, date, amount, syncStatus, createdAt, updatedAt',
+      livestock: 'id, animal_id, species, health_status, syncStatus, createdAt, updatedAt',
+      livestock_logs: 'id, livestock_id, type, date, syncStatus, createdAt, updatedAt',
+      treatments: 'id, crop_id, treatment_date, syncStatus, createdAt, updatedAt',
     });
   }
 }
 
+// --- SINGLETON EXPORT ---
 export const db = new FarmDatabase();

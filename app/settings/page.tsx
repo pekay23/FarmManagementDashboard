@@ -2,15 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Save, RefreshCw, Server, User, Database, Globe, Download, LogOut } from 'lucide-react';
+import { Save, RefreshCw, Server, User, Database, Globe, Download, LogOut, Trash2 } from 'lucide-react';
 import { db } from '@/lib/db';
 import { signOut, useSession } from 'next-auth/react';
 
 export default function SettingsPage() {
-  // 1. Tab State
   const [activeTab, setActiveTab] = useState('general');
-
-  // General Settings State
   const [formData, setFormData] = useState({
     farm_name: '',
     phone: '',
@@ -22,7 +19,6 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const { data: session } = useSession();
 
-  // Load Settings
   useEffect(() => {
     const saved = localStorage.getItem('farmSettings');
     if (saved) {
@@ -38,7 +34,6 @@ export default function SettingsPage() {
   const handleSave = async (e: any) => {
     e.preventDefault();
     setLoading(true);
-    // Always save locally first (Offline Source of Truth)
     localStorage.setItem('farmSettings', JSON.stringify(formData));
     
     try {
@@ -59,7 +54,6 @@ export default function SettingsPage() {
     }
   };
 
-  // Backup Function: Dumps local DB to JSON file
   const handleBackup = async () => {
       try {
         const data = {
@@ -86,7 +80,25 @@ export default function SettingsPage() {
       }
   };
 
-  // Tab Navigation Helper Component
+  // --- NEW: Hard Reset Function ---
+  const handleHardReset = async () => {
+      if (!confirm("This will wipe all data on this device and re-download fresh data from the server. Any unsynced offline changes will be LOST. Continue?")) return;
+      
+      try {
+          setLoading(true);
+          await db.delete(); // Deletes the entire IndexedDB
+          await db.open();   // Re-opens (recreates) it
+          toast.success("Database reset. Reloading...");
+          setTimeout(() => {
+              window.location.href = '/'; // Force full reload to trigger SyncContext pull
+          }, 1000);
+      } catch (e) {
+          console.error(e);
+          toast.error("Failed to reset database");
+          setLoading(false);
+      }
+  };
+
   const TabButton = ({ id, label, icon: Icon }: any) => (
       <button 
         onClick={() => setActiveTab(id)}
@@ -105,8 +117,6 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          
-          {/* Sidebar Tabs */}
           <div className="space-y-2">
               <TabButton id="general" label="General" icon={Globe} />
               <TabButton id="account" label="Account" icon={User} />
@@ -114,7 +124,6 @@ export default function SettingsPage() {
               <TabButton id="api" label="System Info" icon={Server} />
           </div>
 
-          {/* Main Content Area */}
           <div className="md:col-span-3 bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[400px]">
               
               {/* --- GENERAL TAB --- */}
@@ -182,17 +191,29 @@ export default function SettingsPage() {
               {activeTab === 'backup' && (
                   <div className="space-y-6 animate-in fade-in duration-300">
                       <h2 className="text-lg font-bold text-gray-800 border-b pb-2">Data Management</h2>
-                      <p className="text-gray-600 text-sm">
-                          Your data is stored securely on this device for offline access. 
-                          You can download a full backup of your farm data (Crops, Livestock, Inventory, Sales) as a JSON file.
-                      </p>
-                      <button onClick={handleBackup} className="w-full p-8 border-2 border-dashed border-gray-300 rounded-xl hover:border-primary-500 hover:bg-primary-50 transition-all group flex flex-col items-center justify-center gap-2">
-                          <div className="bg-white p-3 rounded-full shadow-sm group-hover:shadow-md">
-                             <Download className="w-8 h-8 text-gray-400 group-hover:text-primary-600" />
-                          </div>
-                          <span className="font-bold text-gray-700 group-hover:text-primary-700">Download Local Backup</span>
-                          <span className="text-xs text-gray-400">JSON Format • All Tables</span>
-                      </button>
+                      <div className="space-y-4">
+                        {/* Download Backup */}
+                        <div className="p-4 border rounded-xl border-gray-200 hover:border-primary-200 transition-colors">
+                            <h3 className="font-bold text-gray-800 mb-1">Export Data</h3>
+                            <p className="text-sm text-gray-600 mb-3">Download a JSON backup of all farm data stored on this device.</p>
+                            <button onClick={handleBackup} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-bold flex items-center gap-2">
+                                <Download className="w-4 h-4" /> Download Backup
+                            </button>
+                        </div>
+
+                        {/* Hard Reset */}
+                        <div className="p-4 border rounded-xl border-red-200 bg-red-50/30">
+                            <h3 className="font-bold text-red-800 mb-1 flex items-center gap-2">
+                                <AlertTriangle className="w-4 h-4" /> Troubleshooting
+                            </h3>
+                            <p className="text-sm text-red-700 mb-3">
+                                If data isn't syncing or you see "ghost" items, use this to clear the local database and re-fetch everything from the server.
+                            </p>
+                            <button onClick={handleHardReset} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold flex items-center gap-2">
+                                <RefreshCw className="w-4 h-4" /> Clear Data & Resync
+                            </button>
+                        </div>
+                      </div>
                   </div>
               )}
 
@@ -228,4 +249,15 @@ export default function SettingsPage() {
       </div>
     </div>
   );
+}
+
+// Icon helper
+function AlertTriangle(props: any) {
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+            <path d="M12 9v4"></path>
+            <path d="M12 17h.01"></path>
+        </svg>
+    )
 }

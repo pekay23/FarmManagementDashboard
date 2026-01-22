@@ -74,7 +74,9 @@ export default function CropManagement() {
         });
         toast.success("Crop updated");
       } else {
+        // GENERATE UUID HERE
         await db.crops.add({ 
+            id: crypto.randomUUID(), 
             ...formData, 
             createdAt: new Date().toISOString(),
             syncStatus: 'pending' 
@@ -107,7 +109,11 @@ export default function CropManagement() {
     };
 
     try {
-      await db.treatments.add(formData as any);
+      // GENERATE UUID HERE
+      await db.treatments.add({
+          id: crypto.randomUUID(),
+          ...formData
+      } as any);
       toast.success("Treatment recorded");
       setIsTreatmentModalOpen(false);
     } catch (err) {

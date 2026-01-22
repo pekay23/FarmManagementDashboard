@@ -19,7 +19,7 @@ export default function SalesReceipts() {
   const inventory = useLiveQuery(() => db.inventory.toArray()) || [];
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]); // Changed to string array for UUIDs
   
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -46,8 +46,10 @@ export default function SalesReceipts() {
 
   // Filter Sales
   const filteredSales = sales.filter(s => 
-    s.customer?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    s.id?.toString().includes(searchQuery)
+    s.syncStatus !== 'deleted' && ( // Filter out logically deleted items
+        s.customer?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        s.id?.toString().includes(searchQuery)
+    )
   );
 
   // Load Settings (Client-Side Only)
@@ -71,12 +73,12 @@ export default function SalesReceipts() {
     if (selectedIds.length === filteredSales.length) {
         setSelectedIds([]); 
     } else {
-        const ids = filteredSales.map(s => s.id).filter((id): id is number => id !== undefined);
+        const ids = filteredSales.map(s => s.id).filter((id): id is string => id !== undefined);
         setSelectedIds(ids); 
     }
   }
 
-  function toggleSelect(id: number) {
+  function toggleSelect(id: string) {
     if (selectedIds.includes(id)) {
         setSelectedIds(selectedIds.filter(i => i !== id));
     } else {
@@ -86,7 +88,18 @@ export default function SalesReceipts() {
 
   async function executeBulkDelete() {
     try {
-        await db.sales.bulkDelete(selectedIds);
+        // Mark as deleted for sync or delete directly if pending
+        await db.transaction('rw', db.sales, async () => {
+            for (const id of selectedIds) {
+                const sale = await db.sales.get(id);
+                if (sale && sale.syncStatus === 'pending') {
+                    await db.sales.delete(id);
+                } else {
+                    await db.sales.update(id, { syncStatus: 'deleted', updatedAt: new Date().toISOString() });
+                }
+            }
+        });
+        
         toast.success(`${selectedIds.length} sales deleted`);
         setSelectedIds([]);
         setIsDeleteModalOpen(false);
@@ -115,13 +128,15 @@ export default function SalesReceipts() {
     if (!buyerName || cartItems.length === 0) return;
 
     const saleData = {
+        id: crypto.randomUUID(), // GENERATE UUID HERE
         customer: buyerName,
         amount: total,
         date: new Date().toISOString(),
         itemsData: cartItems, 
         contact_info: contact,
         syncStatus: 'pending',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
     };
 
     try {
@@ -134,7 +149,8 @@ export default function SalesReceipts() {
                     if (invItem && invItem.id) {
                         await db.inventory.update(invItem.id, {
                             quantity: invItem.quantity - item.qty,
-                            syncStatus: 'updated'
+                            syncStatus: 'updated',
+                            updatedAt: new Date().toISOString()
                         });
                     }
                 }
@@ -462,6 +478,16 @@ export default function SalesReceipts() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function InventoryKpi({ title, value, icon: Icon, color }: any) {
+  const colors: any = { blue: "bg-blue-50 text-blue-600", red: "bg-red-50 text-red-600", green: "bg-green-50 text-green-600" };
+  return (
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+      <div className={`p-3 rounded-lg ${colors[color]}`}><Icon className="w-6 h-6" /></div>
+      <div><p className="text-sm text-gray-500 font-medium">{title}</p><h3 className="text-2xl font-bold text-gray-900">{value}</h3></div>
     </div>
   );
 }

@@ -14,24 +14,29 @@ import WeatherWidget from '@/components/WeatherWidget';
 export default function Dashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadOfflineData() {
+      setLoading(true);
       try {
+        // Helper to exclude deleted items
+        const notDeleted = (item: any) => item.syncStatus !== 'deleted';
+
         const [
-          livestockCount,
+          livestock,
           crops,
           sales,
           inventory,
           tasks,
-          expenses // <--- 1. Fetch Expenses
+          expenses
         ] = await Promise.all([
-          db.livestock.count(),
-          db.crops.toArray(),
-          db.sales.toArray(),
-          db.inventory.toArray(),
-          db.tasks.toArray(),
-          db.expenses.toArray()
+          db.livestock.filter(notDeleted).toArray(),
+          db.crops.filter(notDeleted).toArray(),
+          db.sales.filter(notDeleted).toArray(),
+          db.inventory.filter(notDeleted).toArray(),
+          db.tasks.filter(notDeleted).toArray(),
+          db.expenses.filter(notDeleted).toArray()
         ]);
 
         // 2. Calculate Financials
@@ -40,6 +45,7 @@ export default function Dashboard() {
         const netProfit = totalRevenue - totalExpenses;
 
         const pendingTasks = tasks.filter(t => t.status === 'Pending').length;
+        
         const lowStock = inventory.filter(i => i.quantity <= i.lowStockThreshold);
         
         const overdue = tasks.filter(t => 
@@ -48,19 +54,41 @@ export default function Dashboard() {
             new Date(t.dueDate).getTime() < new Date().getTime()
         );
         
+        // --- UPCOMING HARVESTS (Next 30 Days) ---
+        const today = new Date();
+        const thirtyDaysLater = new Date();
+        thirtyDaysLater.setDate(today.getDate() + 30);
+
         const upcomingHarvests = crops
           .filter(c => {
               const status = c.status?.toLowerCase() || '';
-              return status === 'growing' || status === 'planted';
+              const harvestDate = c.expected_harvest_date ? new Date(c.expected_harvest_date) : null;
+              
+              return (status === 'growing' || status === 'planted') && 
+                     harvestDate && 
+                     harvestDate >= today && 
+                     harvestDate <= thirtyDaysLater;
           })
           .sort((a, b) => new Date(a.expected_harvest_date || '9999-12-31').getTime() - new Date(b.expected_harvest_date || '9999-12-31').getTime())
           .slice(0, 5); 
 
-        const salesTrend = sales.slice(-7).map(s => ({
-            name: new Date(s.date || new Date()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
-            value: s.amount
-        }));
+        // --- SALES TREND (Aggregated by Day) ---
+        const salesByDay: Record<string, number> = {};
+        sales.forEach(sale => {
+            const dateStr = new Date(sale.date).toISOString().split('T')[0]; // YYYY-MM-DD
+            salesByDay[dateStr] = (salesByDay[dateStr] || 0) + (Number(sale.amount) || 0);
+        });
 
+        // Convert to array, sort by date, take last 7
+        const salesTrend = Object.keys(salesByDay)
+            .sort()
+            .slice(-7)
+            .map(dateKey => ({
+                name: new Date(dateKey).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
+                value: salesByDay[dateKey]
+            }));
+
+        // --- ACTIVITY FEED ---
         const activity = [
             ...sales.map(s => ({ 
                 type: 'sale', 
@@ -85,10 +113,10 @@ export default function Dashboard() {
         setData({
           kpi: {
             crops: crops.length,
-            animals: livestockCount,
+            animals: livestock.length,
             sales: totalRevenue,
-            expenses: totalExpenses, // <--- Add to State
-            profit: netProfit,       // <--- Add to State
+            expenses: totalExpenses,
+            profit: netProfit,
             tasks: pendingTasks
           },
           alerts: { lowStock, overdue, harvests: upcomingHarvests },
@@ -96,8 +124,9 @@ export default function Dashboard() {
           activity
         });
 
-      } catch (e) {
+      } catch (e: any) {
         console.error("Failed to load dashboard data", e);
+        setError(e.message || "Error loading data");
       } finally {
         setLoading(false);
       }
@@ -116,7 +145,18 @@ export default function Dashboard() {
     );
   }
 
-  const hasAlerts = (data?.alerts?.lowStock?.length > 0) || (data?.alerts?.overdue?.length > 0);
+  if (error) {
+      return (
+          <div className="p-10 text-center">
+              <div className="inline-block p-4 rounded-full bg-red-50 text-red-500 mb-4"><AlertTriangle className="w-8 h-8" /></div>
+              <h2 className="text-xl font-bold text-gray-900">Dashboard Error</h2>
+              <p className="text-gray-500 mb-4">{error}</p>
+              <button onClick={() => window.location.reload()} className="px-4 py-2 bg-primary-600 text-white rounded-lg">Reload</button>
+          </div>
+      )
+  }
+
+  const hasAlerts = (data?.alerts?.lowStock?.length > 0) || (data?.alerts?.overdue?.length > 0) || (data?.alerts?.harvests?.length > 0);
 
   return (
     <div className="p-4 md:p-8 max-w-[1600px] mx-auto min-h-screen pb-20">
@@ -134,14 +174,14 @@ export default function Dashboard() {
 
       {/* 2. Smart Alerts Banner */}
       {hasAlerts && (
-        <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="mb-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {data.alerts.lowStock.length > 0 && (
                 <div className="bg-red-50 border border-red-100 p-4 rounded-xl flex items-start gap-3">
                     <div className="bg-white p-2 rounded-full shadow-sm"><AlertTriangle className="w-5 h-5 text-red-600" /></div>
                     <div className="flex-1">
                         <h3 className="font-bold text-red-800 text-sm">Low Stock Alert</h3>
                         <div className="mt-1 space-y-1">
-                            {data.alerts.lowStock.map((item: any, i: number) => (
+                            {data.alerts.lowStock.slice(0, 3).map((item: any, i: number) => (
                                 <p key={i} className="text-xs text-red-600">• {item.name} ({item.quantity} {item.unit} left)</p>
                             ))}
                         </div>
@@ -155,11 +195,25 @@ export default function Dashboard() {
                     <div className="flex-1">
                         <h3 className="font-bold text-orange-800 text-sm">Overdue Tasks</h3>
                         <div className="mt-1 space-y-1">
-                            {data.alerts.overdue.map((task: any, i: number) => (
+                            {data.alerts.overdue.slice(0, 3).map((task: any, i: number) => (
                                 <p key={i} className="text-xs text-orange-700">• {task.title} (Due: {new Date(task.dueDate).toLocaleDateString()})</p>
                             ))}
                         </div>
                         <Link href="/tasks" className="text-xs font-bold text-orange-800 mt-2 block hover:underline">Manage Tasks →</Link>
+                    </div>
+                </div>
+            )}
+            {data.alerts.harvests.length > 0 && (
+                <div className="bg-teal-50 border border-teal-100 p-4 rounded-xl flex items-start gap-3">
+                    <div className="bg-white p-2 rounded-full shadow-sm"><Sprout className="w-5 h-5 text-teal-600" /></div>
+                    <div className="flex-1">
+                        <h3 className="font-bold text-teal-800 text-sm">Upcoming Harvests</h3>
+                        <div className="mt-1 space-y-1">
+                            {data.alerts.harvests.map((crop: any, i: number) => (
+                                <p key={i} className="text-xs text-teal-700">• {crop.crop_type} - {crop.plot_number} (Exp: {new Date(crop.expected_harvest_date).toLocaleDateString()})</p>
+                            ))}
+                        </div>
+                        <Link href="/crops" className="text-xs font-bold text-teal-800 mt-2 block hover:underline">View Crops →</Link>
                     </div>
                 </div>
             )}
@@ -185,7 +239,7 @@ export default function Dashboard() {
         {/* Left: Sales Trend */}
         <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-bold text-gray-800">Revenue Trend</h2>
+            <h2 className="text-lg font-bold text-gray-800">Revenue Trend (Last 7 Days)</h2>
             <Link href="/sales" className="text-sm text-primary-600 font-medium hover:underline">View Sales</Link>
           </div>
           <div className="h-72 w-full">

@@ -58,7 +58,9 @@ export default function LivestockManagement() {
              setSelectedAnimal({ ...selectedAnimal, ...formData });
         }
       } else {
+        // GENERATE UUID HERE
         await db.livestock.add({ 
+            id: crypto.randomUUID(), 
             ...formData, 
             createdAt: new Date().toISOString(),
             syncStatus: 'pending' 
@@ -104,20 +106,24 @@ export default function LivestockManagement() {
         // Update main animal weight too
         await db.livestock.update(selectedAnimal.id, { 
             current_weight_kg: newWeight,
-            syncStatus: 'updated'
+            syncStatus: 'updated',
+            updatedAt: new Date().toISOString()
         });
         setSelectedAnimal({ ...selectedAnimal, current_weight_kg: newWeight });
     }
 
     try {
+        // GENERATE UUID HERE
         await db.livestock_logs.add({
+            id: crypto.randomUUID(),
             livestock_id: selectedAnimal.id,
             type: type as any,
             date: date,
             data: specificData,
             syncStatus: 'pending',
-            createdAt: new Date().toISOString()
-        } as any); // Cast as any to bypass strict type check on new table
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        } as any);
         
         toast.success("Record saved");
         setModalType(null);

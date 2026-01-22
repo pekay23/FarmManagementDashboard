@@ -46,14 +46,17 @@ export default function Reports() {
         startDate.setFullYear(now.getFullYear() - 1);
       }
 
+      // Helper to exclude deleted items
+      const notDeleted = (item: any) => item.syncStatus !== 'deleted';
+
       // --- 1. OVERVIEW ---
       if (reportType === 'overview') {
         const [crops, animals, sales, tasks, expenses] = await Promise.all([
-            db.crops.toArray(),
-            db.livestock.toArray(),
-            db.sales.where('date').above(startDate.toISOString()).toArray(),
-            db.tasks.toArray(),
-            db.expenses.where('date').above(startDate.toISOString()).toArray()
+            db.crops.filter(notDeleted).toArray(),
+            db.livestock.filter(notDeleted).toArray(),
+            db.sales.where('date').above(startDate.toISOString()).filter(notDeleted).toArray(),
+            db.tasks.filter(notDeleted).toArray(),
+            db.expenses.where('date').above(startDate.toISOString()).filter(notDeleted).toArray()
         ]);
 
         const totalRevenue = sales.reduce((acc, s) => acc + (Number(s.amount) || 0), 0);
@@ -86,7 +89,7 @@ export default function Reports() {
 
       // --- 2. SALES ---
       else if (reportType === 'sales') {
-        const sales = await db.sales.where('date').above(startDate.toISOString()).toArray();
+        const sales = await db.sales.where('date').above(startDate.toISOString()).filter(notDeleted).toArray();
         
         const totalRevenue = sales.reduce((acc, s) => acc + (Number(s.amount) || 0), 0);
         const avgTicket = sales.length > 0 ? totalRevenue / sales.length : 0;
@@ -116,7 +119,7 @@ export default function Reports() {
 
       // --- 3. EXPENSES (NEW) ---
       else if (reportType === 'expenses') {
-        const expenses = await db.expenses.where('date').above(startDate.toISOString()).toArray();
+        const expenses = await db.expenses.where('date').above(startDate.toISOString()).filter(notDeleted).toArray();
         const totalExpense = expenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
         const avgExpense = expenses.length > 0 ? totalExpense / expenses.length : 0;
 
@@ -146,7 +149,7 @@ export default function Reports() {
 
       // --- 4. INVENTORY ---
       else if (reportType === 'inventory') {
-        const items = await db.inventory.toArray();
+        const items = await db.inventory.filter(notDeleted).toArray();
         const lowStock = items.filter(i => i.quantity <= i.lowStockThreshold).length;
         const valuation = items.reduce((acc, i) => acc + (i.quantity * (i.unitPrice || 0)), 0);
 
@@ -170,13 +173,14 @@ export default function Reports() {
 
       // --- 5. TASKS ---
       else if (reportType === 'tasks') {
-        const tasks = await db.tasks.toArray();
+        const tasks = await db.tasks.filter(notDeleted).toArray();
         const completed = tasks.filter(t => t.status === 'Completed').length;
-        const overdue = tasks.filter(t => t.status !== 'Completed' && new Date(t.dueDate) < new Date()).length;
+        const overdue = tasks.filter(t => t.status !== 'Completed' && new Date(t.dueDate || '').getTime() < new Date().getTime()).length;
         
         const priorityMap: Record<string, number> = {};
         tasks.filter(t => t.status === 'Pending').forEach(t => {
-            priorityMap[t.priority] = (priorityMap[t.priority] || 0) + 1;
+            const p = t.priority || 'Medium';
+            priorityMap[p] = (priorityMap[p] || 0) + 1;
         });
         const priorityDist = Object.keys(priorityMap).map(k => ({ name: k, value: priorityMap[k] }));
 
@@ -186,7 +190,7 @@ export default function Reports() {
 
       // --- 6. CROPS ---
       else if (reportType === 'crops') {
-        const crops = await db.crops.toArray();
+        const crops = await db.crops.filter(notDeleted).toArray();
         const harvested = crops.filter(c => c.status === 'Harvested').length;
         const planted = crops.filter(c => c.status === 'Planted' || c.status === 'Growing').length;
 
@@ -214,14 +218,14 @@ export default function Reports() {
 
       // --- 7. LIVESTOCK ---
       else if (reportType === 'livestock') {
-        const animals = await db.livestock.toArray();
+        const animals = await db.livestock.filter(notDeleted).toArray();
         const sick = animals.filter(a => a.health_status === 'Sick').length;
         const sold = animals.filter(a => a.health_status === 'Sold').length;
         
         // FIXED: Safe Key Access Logic
-        const getDist = (field: keyof typeof animals[0]) => {
+        const getDist = (field: string) => {
             const map: Record<string, number> = {};
-            animals.forEach(a => { 
+            animals.forEach((a: any) => { 
                 const val = a[field];
                 // Force string key safely
                 const key = val !== undefined && val !== null ? String(val) : 'Unknown';
