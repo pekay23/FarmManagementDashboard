@@ -33,7 +33,6 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             if (emp && emp.id) assigneeIds.push(emp.id);
         }
     }
-    // Filter duplicates on client side before sending
     const uniqueIds = [...new Set(assigneeIds)];
 
     return {
@@ -116,10 +115,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   async function processSingleItemPush(table: any, item: any, endpoint: string, payload: any) {
         const isNew = item.syncStatus === 'pending';
         const isDeleted = item.syncStatus === 'deleted';
-        const method = isDeleted ? 'DELETE' : (isNew ? 'POST' : 'PUT');
-
+        
         try {
           const body = isDeleted ? { id: item.id } : { ...payload, id: isNew ? undefined : item.id };
+          const method = isDeleted ? 'DELETE' : (isNew ? 'POST' : 'PUT');
+
           const res = await fetch(endpoint, {
             method,
             headers: { 'Content-Type': 'application/json' },
@@ -174,12 +174,28 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         if (!Array.isArray(serverItems)) continue;
 
         await db.transaction('rw', table, async () => {
+          // 1. Get all Server IDs for this table
+          const serverIds = new Set(serverItems.map((i: any) => i.id.toString()));
+
+          // 2. Update/Insert Server Data
           for (const sItem of serverItems) {
             const localItem = mapServerToLocal(sItem, table.name);
             const existing = await table.get(localItem.id);
+            // Overwrite if synced or missing
             if (!existing || existing.syncStatus === 'synced') {
                await table.put(localItem);
             }
+          }
+
+          // 3. CLEANUP: Delete local items that are 'synced' but NOT on server anymore
+          // (This handles deletions that happened on another device)
+          const localSyncedItems = await table.where('syncStatus').equals('synced').toArray();
+          const itemsToDelete = localSyncedItems.filter((local: any) => !serverIds.has(local.id));
+          
+          if (itemsToDelete.length > 0) {
+              const deleteIds = itemsToDelete.map((i: any) => i.id);
+              await table.bulkDelete(deleteIds);
+              console.log(`Cleaned up ${deleteIds.length} stale items from ${table.name}`);
           }
         });
       } catch (e) {
@@ -197,7 +213,6 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     
     setIsSyncing(true);
     
-    // Decoupled Push and Pull so one failure doesn't block the other
     try { await pushDataToServer(); } catch (e) { console.error("Push Failed", e); }
     try { await pullDataFromServer(); } catch (e) { console.error("Pull Failed", e); }
     
