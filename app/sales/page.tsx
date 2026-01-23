@@ -13,56 +13,56 @@ import autoTable from 'jspdf-autotable';
 import { logoBase64 } from "@/lib/logo";
 import { addSvgToPdf } from '@/lib/pdfUtils';
 
+// ✅ SAFE UUID GENERATOR
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 export default function SalesReceipts() {
-  // 1. REAL-TIME DATA
   const sales = useLiveQuery(() => db.sales.toArray().then(rows => rows.reverse())) || [];
   const inventory = useLiveQuery(() => db.inventory.toArray()) || [];
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedIds, setSelectedIds] = useState<string[]>([]); // Changed to string array for UUIDs
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
-  // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [viewingReceipt, setViewingReceipt] = useState<any>(null);
   
-  // Settings - Initialize with defaults
   const [settings, setSettings] = useState<any>({ 
       farm_name: 'Hughes Farms', 
       phone: '', email: '', address: '', receipt_footer: 'Thank you!', tax_rate: 0 
   });
 
-  // Cart State
   const [cartItems, setCartItems] = useState([{ id: 1, name: '', qty: 1, price: 0 }]);
   const [buyerName, setBuyerName] = useState('');
   const [contact, setContact] = useState('');
   const [deductInventory, setDeductInventory] = useState(true);
 
-  // Calculations
   const subtotal = cartItems.reduce((acc, item) => acc + (Number(item.qty) * Number(item.price)), 0);
   const taxAmount = subtotal * (Number(settings.tax_rate) / 100);
   const total = subtotal + taxAmount;
 
-  // Filter Sales
   const filteredSales = sales.filter(s => 
-    s.syncStatus !== 'deleted' && ( // Filter out logically deleted items
+    s.syncStatus !== 'deleted' && (
         s.customer?.toLowerCase().includes(searchQuery.toLowerCase()) || 
         s.id?.toString().includes(searchQuery)
     )
   );
 
-  // Load Settings (Client-Side Only)
   useEffect(() => {
-      // Check if we are in the browser
       if (typeof window !== 'undefined') {
           const saved = localStorage.getItem('farmSettings');
           if (saved) {
-              try {
-                  setSettings(JSON.parse(saved));
-              } catch (e) {
-                  console.error("Failed to parse settings", e);
-              }
+              try { setSettings(JSON.parse(saved)); } catch (e) {}
           }
       }
   }, []);
@@ -88,7 +88,6 @@ export default function SalesReceipts() {
 
   async function executeBulkDelete() {
     try {
-        // Mark as deleted for sync or delete directly if pending
         await db.transaction('rw', db.sales, async () => {
             for (const id of selectedIds) {
                 const sale = await db.sales.get(id);
@@ -99,7 +98,6 @@ export default function SalesReceipts() {
                 }
             }
         });
-        
         toast.success(`${selectedIds.length} sales deleted`);
         setSelectedIds([]);
         setIsDeleteModalOpen(false);
@@ -108,7 +106,6 @@ export default function SalesReceipts() {
     }
   }
 
-  // Cart Logic
   function addItem() { setCartItems([...cartItems, { id: Date.now(), name: '', qty: 1, price: 0 }]); }
   function removeItem(id: number) { setCartItems(cartItems.filter(item => item.id !== id)); }
   function updateItem(id: number, field: string, value: any) { 
@@ -125,10 +122,17 @@ export default function SalesReceipts() {
   }
 
   async function handleRecordSale() {
-    if (!buyerName || cartItems.length === 0) return;
+    if (!buyerName) {
+        toast.error("Please enter a buyer name");
+        return;
+    }
+    if (cartItems.length === 0) {
+        toast.error("Please add at least one item");
+        return;
+    }
 
     const saleData = {
-        id: crypto.randomUUID(), // GENERATE UUID HERE
+        id: generateUUID(), // ✅ Fixed: Safe UUID
         customer: buyerName,
         amount: total,
         date: new Date().toISOString(),
@@ -161,6 +165,7 @@ export default function SalesReceipts() {
         setIsModalOpen(false);
         setBuyerName(''); setContact(''); setCartItems([{ id: Date.now(), name: '', qty: 1, price: 0 }]);
     } catch (err) {
+        console.error(err);
         toast.error("Failed to record sale");
     }
   }
@@ -181,13 +186,11 @@ export default function SalesReceipts() {
     toast.success("Settings saved!");
   }
 
-  // --- PDF GENERATOR ---
   async function generateReceiptPDF(sale: any) {
     const doc = new jsPDF();
     const currency = "GHS";
     
-    // Header
-    doc.setFillColor(20, 184, 166); // Teal
+    doc.setFillColor(20, 184, 166);
     doc.rect(0, 0, 210, 55, 'F');
     
     if (logoBase64) {
@@ -203,14 +206,12 @@ export default function SalesReceipts() {
     doc.text(`${settings.phone || ''} | ${settings.email || ''}`, 105, 36, { align: "center" });
     if (settings.address) doc.text(settings.address, 105, 42, { align: "center" });
 
-    // Customer
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(11);
     doc.text(`Receipt #: ${(sale.id || 'N/A').toString().slice(0, 8).toUpperCase()}`, 14, 70);
     doc.text(`Date: ${new Date(sale.date).toLocaleDateString()}`, 14, 76);
     doc.text(`Buyer: ${sale.customer}`, 14, 82);
 
-    // Items
     const items = sale.itemsData || []; 
     autoTable(doc, {
         startY: 90,
@@ -321,84 +322,6 @@ export default function SalesReceipts() {
         </div>
       </div>
 
-      {/* --- MODALS --- */}
-
-      {/* VIEW RECEIPT MODAL */}
-      {viewingReceipt && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={() => setViewingReceipt(null)}>
-            <div className="bg-white rounded-xl w-full max-w-sm shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
-                <h3 className="text-center font-bold text-lg mb-4">Sale Details</h3>
-                <div className="space-y-3 text-sm">
-                    <div className="flex justify-between border-b pb-2"><span className="text-gray-500">Date:</span> <span>{new Date(viewingReceipt.date).toLocaleString()}</span></div>
-                    <div className="flex justify-between border-b pb-2"><span className="text-gray-500">Buyer:</span> <span>{viewingReceipt.customer}</span></div>
-                    <div className="flex justify-between border-b pb-2"><span className="text-gray-500">Contact:</span> <span>{viewingReceipt.contact_info || 'N/A'}</span></div>
-                </div>
-                <div className="mt-6">
-                    <h4 className="font-bold mb-2">Items</h4>
-                    <div className="space-y-2 border p-3 rounded-lg bg-gray-50">
-                        {viewingReceipt.itemsData?.map((item: any, i: number) => (
-                            <div key={i} className="flex justify-between text-sm">
-                                <span>{item.name} (x{item.qty})</span>
-                                <span className="font-medium">GH₵ {(Number(item.qty) * Number(item.price)).toFixed(2)}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-                <div className="mt-6 border-t pt-4">
-                    <div className="flex justify-between font-bold text-lg text-gray-900"><span>Total:</span> <span>GH₵ {Number(viewingReceipt.amount).toFixed(2)}</span></div>
-                </div>
-                <div className="flex gap-4 mt-8">
-                    <button onClick={() => setViewingReceipt(null)} className="flex-1 bg-gray-100 py-3 rounded-lg font-medium">Close</button>
-                    <button onClick={() => generateReceiptPDF(viewingReceipt)} className="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2">
-                        <Download className="w-4 h-4" /> Download
-                    </button>
-                </div>
-            </div>
-        </div>
-      )}
-
-      {/* DELETE MODAL */}
-      {isDeleteModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-xl w-full max-w-sm p-6 shadow-2xl text-center animate-in zoom-in-95">
-                <div className="bg-red-50 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                    <AlertTriangle className="w-8 h-8 text-red-500"/>
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Sales?</h3>
-                <p className="text-gray-500 text-sm mb-6">
-                    You are about to delete <strong>{selectedIds.length}</strong> records. 
-                    This action cannot be undone.
-                </p>
-                <div className="flex gap-3">
-                    <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 py-2.5 bg-gray-100 rounded-lg font-bold text-gray-600 hover:bg-gray-200">Cancel</button>
-                    <button onClick={executeBulkDelete} className="flex-1 py-2.5 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700">Delete</button>
-                </div>
-            </div>
-        </div>
-      )}
-
-      {/* SETTINGS MODAL */}
-      {isSettingsOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-xl w-full max-w-md shadow-2xl p-6 animate-in zoom-in-95">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">Receipt Settings</h2>
-                    <button onClick={() => setIsSettingsOpen(false)}><X className="text-gray-400" /></button>
-                </div>
-                <form onSubmit={handleSaveSettings} className="space-y-4">
-                    <input name="farm_name" required defaultValue={settings.farm_name} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Farm Name"/>
-                    <input name="phone" defaultValue={settings.phone} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Phone"/>
-                    <input name="email" defaultValue={settings.email} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Email"/>
-                    <input name="address" defaultValue={settings.address} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Address"/>
-                    <input name="footer" defaultValue={settings.receipt_footer} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Footer Message"/>
-                    <input name="tax" type="number" defaultValue={settings.tax_rate} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Tax Rate (%)"/>
-                    <button className="w-full bg-gray-900 text-white py-2 rounded font-bold">Save Settings</button>
-                </form>
-            </div>
-        </div>
-      )}
-
-      {/* NEW SALE MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95">
@@ -478,16 +401,78 @@ export default function SalesReceipts() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
+      
+      {viewingReceipt && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={() => setViewingReceipt(null)}>
+            <div className="bg-white rounded-xl w-full max-w-sm shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-center font-bold text-lg mb-4">Sale Details</h3>
+                <div className="space-y-3 text-sm">
+                    <div className="flex justify-between border-b pb-2"><span className="text-gray-500">Date:</span> <span>{new Date(viewingReceipt.date).toLocaleString()}</span></div>
+                    <div className="flex justify-between border-b pb-2"><span className="text-gray-500">Buyer:</span> <span>{viewingReceipt.customer}</span></div>
+                    <div className="flex justify-between border-b pb-2"><span className="text-gray-500">Contact:</span> <span>{viewingReceipt.contact_info || 'N/A'}</span></div>
+                </div>
+                <div className="mt-6">
+                    <h4 className="font-bold mb-2">Items</h4>
+                    <div className="space-y-2 border p-3 rounded-lg bg-gray-50">
+                        {viewingReceipt.itemsData?.map((item: any, i: number) => (
+                            <div key={i} className="flex justify-between text-sm">
+                                <span>{item.name} (x{item.qty})</span>
+                                <span className="font-medium">GH₵ {(Number(item.qty) * Number(item.price)).toFixed(2)}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <div className="mt-6 border-t pt-4">
+                    <div className="flex justify-between font-bold text-lg text-gray-900"><span>Total:</span> <span>GH₵ {Number(viewingReceipt.amount).toFixed(2)}</span></div>
+                </div>
+                <div className="flex gap-4 mt-8">
+                    <button onClick={() => setViewingReceipt(null)} className="flex-1 bg-gray-100 py-3 rounded-lg font-medium">Close</button>
+                    <button onClick={() => generateReceiptPDF(viewingReceipt)} className="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2">
+                        <Download className="w-4 h-4" /> Download
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
 
-function InventoryKpi({ title, value, icon: Icon, color }: any) {
-  const colors: any = { blue: "bg-blue-50 text-blue-600", red: "bg-red-50 text-red-600", green: "bg-green-50 text-green-600" };
-  return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-      <div className={`p-3 rounded-lg ${colors[color]}`}><Icon className="w-6 h-6" /></div>
-      <div><p className="text-sm text-gray-500 font-medium">{title}</p><h3 className="text-2xl font-bold text-gray-900">{value}</h3></div>
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-xl w-full max-w-sm p-6 shadow-2xl text-center animate-in zoom-in-95">
+                <div className="bg-red-50 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                    <AlertTriangle className="w-8 h-8 text-red-500"/>
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Sales?</h3>
+                <p className="text-gray-500 text-sm mb-6">
+                    You are about to delete <strong>{selectedIds.length}</strong> records. 
+                    This action cannot be undone.
+                </p>
+                <div className="flex gap-3">
+                    <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 py-2.5 bg-gray-100 rounded-lg font-bold text-gray-600 hover:bg-gray-200">Cancel</button>
+                    <button onClick={executeBulkDelete} className="flex-1 py-2.5 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700">Delete</button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {isSettingsOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-xl w-full max-w-md shadow-2xl p-6 animate-in zoom-in-95">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">Receipt Settings</h2>
+                    <button onClick={() => setIsSettingsOpen(false)}><X className="text-gray-400" /></button>
+                </div>
+                <form onSubmit={handleSaveSettings} className="space-y-4">
+                    <input name="farm_name" required defaultValue={settings.farm_name} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Farm Name"/>
+                    <input name="phone" defaultValue={settings.phone} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Phone"/>
+                    <input name="email" defaultValue={settings.email} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Email"/>
+                    <input name="address" defaultValue={settings.address} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Address"/>
+                    <input name="footer" defaultValue={settings.receipt_footer} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Footer Message"/>
+                    <input name="tax" type="number" defaultValue={settings.tax_rate} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Tax Rate (%)"/>
+                    <button className="w-full bg-gray-900 text-white py-2 rounded font-bold">Save Settings</button>
+                </form>
+            </div>
+        </div>
+      )}
     </div>
   );
 }

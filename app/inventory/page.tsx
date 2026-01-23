@@ -9,6 +9,18 @@ import {
   X, Loader2, Pencil, Trash2, CheckCircle 
 } from 'lucide-react';
 
+// ✅ SAFE UUID GENERATOR (Works on all devices/networks)
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 export default function Inventory() {
   // 1. REAL-TIME DATA
   // Filter out deleted items locally so they disappear immediately from UI
@@ -45,9 +57,9 @@ export default function Inventory() {
             await db.inventory.update(editingItem.id, { ...formData, syncStatus: 'updated' });
             toast.success("Item updated");
         } else {
-            // GENERATE UUID HERE
+            // ✅ USE SAFE UUID
             await db.inventory.add({ 
-                id: crypto.randomUUID(), 
+                id: generateUUID(), 
                 ...formData, 
                 createdAt: new Date().toISOString(),
                 syncStatus: 'pending' 
@@ -56,6 +68,7 @@ export default function Inventory() {
         }
         setIsModalOpen(false);
     } catch (err) {
+        console.error(err);
         toast.error("Failed to save item");
     }
   }

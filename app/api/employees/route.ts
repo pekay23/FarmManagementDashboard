@@ -6,7 +6,6 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const client = await pool.connect();
   try {
-    // We use standard SQL syntax here with standard quotes
     const query = `
       SELECT 
         e.id, e.full_name, e.role, e.contact_info, e.created_at, e.status,
@@ -32,22 +31,28 @@ export async function GET() {
 export async function POST(request: Request) {
   const client = await pool.connect();
   try {
-    const body = await request.json();
-    const { full_name, role, contact_info } = body;
+    // Robust Body Parsing: Read text first to avoid crashing on empty body
+    const text = await request.text();
+    if (!text) {
+        return NextResponse.json({ error: 'Request body is empty' }, { status: 400 });
+    }
+    
+    const body = JSON.parse(text);
+    const { full_name, role, contact_info, status } = body;
 
     const query = `
       INSERT INTO employees (full_name, role, contact_info, status) 
-      VALUES ($1, $2, $3, 'Active') 
+      VALUES ($1, $2, $3, $4) 
       RETURNING *
     `;
 
-    const values = [full_name, role, contact_info];
+    const values = [full_name, role, contact_info, status || 'Active'];
     
     const result = await client.query(query, values);
     return NextResponse.json(result.rows[0]);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Create employee error:', error);
-    return NextResponse.json({ error: 'Failed' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed' }, { status: 500 });
   } finally {
     client.release();
   }
@@ -56,7 +61,10 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const client = await pool.connect();
   try {
-    const body = await request.json();
+    const text = await request.text();
+    if (!text) return NextResponse.json({ error: 'Empty body' }, { status: 400 });
+    
+    const body = JSON.parse(text);
     const { id, full_name, role, contact_info, status } = body;
 
     const query = `
@@ -66,12 +74,13 @@ export async function PUT(request: Request) {
           contact_info = $3, 
           status = $4 
       WHERE id = $5
+      RETURNING *
     `;
 
     const values = [full_name, role, contact_info, status, id];
 
-    await client.query(query, values);
-    return NextResponse.json({ success: true });
+    const result = await client.query(query, values);
+    return NextResponse.json(result.rows[0]);
   } catch (error) {
     console.error('Update employee error:', error);
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
@@ -83,7 +92,11 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   const client = await pool.connect();
   try {
-    const { id } = await request.json();
+    const text = await request.text();
+    if (!text) return NextResponse.json({ error: 'Empty body' }, { status: 400 });
+
+    const body = JSON.parse(text);
+    const { id } = body;
 
     const query = 'DELETE FROM employees WHERE id = $1';
     await client.query(query, [id]);

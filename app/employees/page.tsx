@@ -9,6 +9,18 @@ import {
   X, Briefcase, Trash2, Pencil, Calendar, AlertTriangle, Phone 
 } from 'lucide-react';
 
+// ✅ SAFE UUID GENERATOR (Works on mobile/http)
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 export default function EmployeeTaskManagement() {
   // 1. REAL-TIME DATA
   const employees = useLiveQuery(() => db.employees.toArray().then(rows => rows.reverse())) || [];
@@ -16,11 +28,7 @@ export default function EmployeeTaskManagement() {
 
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<any>(null);
-  
-  // Custom State for Checkbox Multi-Select
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
-  
-  // Delete Confirmation (Updated id to string for UUIDs)
   const [confirmDelete, setConfirmDelete] = useState<{ show: boolean, type: string, id: string | null }>({ show: false, type: '', id: null });
 
   // --- ACTIONS (Offline First) ---
@@ -39,9 +47,9 @@ export default function EmployeeTaskManagement() {
             await db.employees.update(editingItem.id, { ...formData, syncStatus: 'updated' });
             toast.success("Employee updated");
         } else {
-            // GENERATE UUID HERE
+            // ✅ USE SAFE UUID
             await db.employees.add({ 
-                id: crypto.randomUUID(), 
+                id: generateUUID(), 
                 ...formData, 
                 createdAt: new Date().toISOString(),
                 syncStatus: 'pending' 
@@ -51,6 +59,7 @@ export default function EmployeeTaskManagement() {
         setActiveModal(null);
         setEditingItem(null);
     } catch (err) {
+        console.error(err);
         toast.error("Failed to save employee");
     }
   }
@@ -63,7 +72,7 @@ export default function EmployeeTaskManagement() {
         assignedTo: selectedAssignees.join(','), 
         dueDate: e.target.due_date.value,
         priority: e.target.priority.value,
-        status: editingItem ? editingItem.status : 'Pending', // Preserve status on edit
+        status: editingItem ? editingItem.status : 'Pending',
         updatedAt: new Date().toISOString()
     };
 
@@ -75,9 +84,9 @@ export default function EmployeeTaskManagement() {
             });
             toast.success("Task updated");
         } else {
-            // GENERATE UUID HERE
+            // ✅ USE SAFE UUID
             await db.tasks.add({ 
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 ...formData, 
                 createdAt: new Date().toISOString(),
                 syncStatus: 'pending' 
@@ -98,9 +107,19 @@ export default function EmployeeTaskManagement() {
 
     try {
         if (type === 'employee') {
-            await db.employees.delete(id);
+            const emp = await db.employees.get(id);
+            if (emp && emp.syncStatus === 'pending') {
+                await db.employees.delete(id);
+            } else {
+                await db.employees.update(id, { syncStatus: 'deleted', updatedAt: new Date().toISOString() });
+            }
         } else {
-            await db.tasks.delete(id);
+            const task = await db.tasks.get(id);
+            if (task && task.syncStatus === 'pending') {
+                await db.tasks.delete(id);
+            } else {
+                await db.tasks.update(id, { syncStatus: 'deleted', updatedAt: new Date().toISOString() });
+            }
         }
         toast.success(`${type === 'employee' ? 'Employee' : 'Task'} deleted`);
     } catch (err) {
@@ -123,10 +142,8 @@ export default function EmployeeTaskManagement() {
     }
   }
 
-  // --- Helper to open modals with correct data ---
   function openTaskModal(task?: any) {
       setEditingItem(task || null);
-      // Parse assignedTo string back to array if editing
       if (task?.assignedTo) {
           setSelectedAssignees(task.assignedTo.split(','));
       } else {
@@ -143,10 +160,13 @@ export default function EmployeeTaskManagement() {
       }
   }
 
-  // KPIs
-  const activeTaskCount = tasks.filter(t => t.status === 'Pending').length;
-  const overdueCount = tasks.filter(t => t.status !== 'Completed' && t.dueDate && new Date(t.dueDate) < new Date()).length;
-  const completedCount = tasks.filter(t => t.status === 'Completed').length;
+  // Filter out deleted items from view
+  const visibleEmployees = employees.filter(e => e.syncStatus !== 'deleted');
+  const visibleTasks = tasks.filter(t => t.syncStatus !== 'deleted');
+
+  const activeTaskCount = visibleTasks.filter(t => t.status === 'Pending').length;
+  const overdueCount = visibleTasks.filter(t => t.status !== 'Completed' && t.dueDate && new Date(t.dueDate) < new Date()).length;
+  const completedCount = visibleTasks.filter(t => t.status === 'Completed').length;
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-screen relative pb-20">
@@ -167,7 +187,7 @@ export default function EmployeeTaskManagement() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <KpiCard title="Total Staff" value={employees.length} icon={Users} color="blue" />
+        <KpiCard title="Total Staff" value={visibleEmployees.length} icon={Users} color="blue" />
         <KpiCard title="Active Tasks" value={activeTaskCount} icon={Clock} color="yellow" />
         <KpiCard title="Overdue" value={overdueCount} icon={AlertCircle} color="red" />
         <KpiCard title="Completed" value={completedCount} icon={CheckCircle} color="green" />
@@ -181,8 +201,8 @@ export default function EmployeeTaskManagement() {
                 <Users className="w-5 h-5 text-gray-400"/> Employees
             </h3>
             <div className="space-y-4">
-                {employees.length === 0 && <p className="text-gray-400 text-sm italic">No employees added yet.</p>}
-                {employees.map((emp: any) => (
+                {visibleEmployees.length === 0 && <p className="text-gray-400 text-sm italic">No employees added yet.</p>}
+                {visibleEmployees.map((emp: any) => (
                     <div key={emp.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex justify-between items-start">
                         <div>
                             <h4 className="font-bold text-gray-900 flex items-center gap-2">
@@ -211,8 +231,8 @@ export default function EmployeeTaskManagement() {
                 <Briefcase className="w-5 h-5 text-gray-400"/> Recent Tasks
             </h3>
             <div className="space-y-4">
-                {tasks.length === 0 && <p className="text-gray-400 text-sm italic">No tasks created yet.</p>}
-                {tasks.map((task: any) => {
+                {visibleTasks.length === 0 && <p className="text-gray-400 text-sm italic">No tasks created yet.</p>}
+                {visibleTasks.map((task: any) => {
                     const isOverdue = task.status !== 'Completed' && task.dueDate && new Date(task.dueDate) < new Date();
                     const isCompleted = task.status === 'Completed';
                     
@@ -228,7 +248,6 @@ export default function EmployeeTaskManagement() {
                         
                         <p className="text-sm text-gray-600 mb-4">{task.description}</p>
                         
-                        {/* Assignees Tags */}
                         {task.assignedTo && (
                             <div className="flex flex-wrap gap-1 mb-3">
                                 {task.assignedTo.split(',').map((name: string, i: number) => (
@@ -266,6 +285,9 @@ export default function EmployeeTaskManagement() {
         </div>
       </div>
 
+      {/* MODALS (Same as before, just ensuring use of handleSave* functions) */}
+      {/* ... (Modal JSX is fine, logic is handled above) ... */}
+      
       {/* MODAL: Employee */}
       {activeModal === 'employee' && (
         <Modal title={editingItem ? "Update Employee" : "Add Employee"} onClose={() => {setActiveModal(null); setEditingItem(null);}}>
@@ -313,10 +335,10 @@ export default function EmployeeTaskManagement() {
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Assign to Employee(s)</label>
                     <div className="border p-3 rounded-lg bg-white max-h-40 overflow-y-auto">
-                        {employees.length === 0 ? (
+                        {visibleEmployees.length === 0 ? (
                             <p className="text-xs text-gray-400">No employees found. Add one first.</p>
                         ) : (
-                            employees.map((emp: any) => (
+                            visibleEmployees.map((emp: any) => (
                                 <div key={emp.id} className="flex items-center gap-2 mb-2 last:mb-0 hover:bg-gray-50 p-1 rounded">
                                     <input 
                                         type="checkbox" 
