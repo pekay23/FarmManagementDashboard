@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { Pool } = require('pg');
 // REMEMBER: Paste your real connection string below!
-const pool = new Pool({ connectionString: 'postgresql://neondb_owner:npg_hdSG9s0AcyKv@ep-purple-boat-ahboxytm-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require' });
+const pool = new Pool({ connectionString: 'postgresql://neondb_owner:npg_OhW1vo7EYIKA@ep-purple-boat-ahboxytm-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require' });
 
 async function run() {
   const email = 'floowdis@gmail.com'; // The email to reset
