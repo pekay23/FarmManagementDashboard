@@ -256,33 +256,61 @@ export default function Reports() {
   async function generatePDF() {
     if (!data) return;
     const doc = new jsPDF();
+    const primaryEmerald: [number, number, number] = [6, 78, 59];
     
-    // Header
-    doc.setFillColor(20, 184, 166); // Primary Teal
-    doc.rect(0, 0, 210, 45, 'F');
+    // 1. Executive Header
+    doc.setFillColor(primaryEmerald[0], primaryEmerald[1], primaryEmerald[2]);
+    doc.rect(0, 0, 210, 40, 'F');
     
     if (logoBase64) {
       const svgString = atob(logoBase64.split(',')[1]);
-      await addSvgToPdf(doc, svgString, 15, 7, 30, 30);
+      await addSvgToPdf(doc, svgString, 15, 5, 25, 25);
     }
-    
+
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
-    doc.text(`${reportType.toUpperCase()} REPORT`, 105, 28, { align: "center" });
-    
-    // KPI Table
-    if (data.kpi) {
-        const kpiRows = Object.entries(data.kpi).map(([key, val]: any) => [key.replace(/_/g, ' ').toUpperCase(), typeof val === 'number' ? val.toLocaleString() : val]);
-        autoTable(doc, { 
-            startY: 65, 
-            head: [['Metric', 'Value']], 
-            body: kpiRows,
-            headStyles: { fillColor: [20, 184, 166] }
-        });
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text(`${reportType.toUpperCase()} PERFORMANCE REPORT`, 50, 20);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Generated on: ${new Date().toLocaleString()} | Period: ${period.toUpperCase()}`, 50, 28);
+
+    // 2. Clear KPI Table
+    const kpiRows = Object.entries(data.kpi).map(([key, val]: any) => [
+        key.replace(/_/g, ' ').toUpperCase(), 
+        typeof val === 'number' ? val.toLocaleString() : val
+    ]);
+
+    autoTable(doc, { 
+        startY: 50, 
+        head: [['PERFORMANCE METRIC', 'VALUE']], 
+        body: kpiRows,
+        headStyles: { fillColor: primaryEmerald, fontStyle: 'bold' },
+        styles: { cellPadding: 4, fontSize: 10 },
+        alternateRowStyles: { fillColor: [245, 255, 250] } 
+    });
+
+    // 3. Footer
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Page ${i} of ${pageCount} - Hughes Farms Proprietary Data`, 105, 290, { align: "center" });
     }
-    
-    doc.save(`${reportType}_Report.pdf`);
-    toast.success("Report downloaded successfully");
+
+    doc.save(`HughesFarm_${reportType}_${Date.now()}.pdf`);
+    toast.success("Professional report generated!");
+  }
+
+  // ✅ FIX: WHITE SCREEN PROTECTION
+  if (loading || !data) {
+      return (
+          <div className="flex flex-col items-center justify-center min-h-screen text-gray-400">
+              <Package className="w-12 h-12 animate-bounce mb-4 opacity-20" />
+              <p>Calculating your farm report...</p>
+          </div>
+      );
   }
 
   // --- DYNAMIC CONTENT RENDERERS ---
@@ -566,7 +594,6 @@ export default function Reports() {
   return (
     <div className="p-4 md:p-8 max-w-[1600px] mx-auto min-h-screen relative pb-20">
       
-      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
@@ -600,16 +627,12 @@ export default function Reports() {
         </div>
       </div>
 
-      {loading ? <div className="text-center py-20 text-gray-400">Processing data...</div> : (
-        <>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
-                {renderKPIs()}
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {renderCharts()}
-            </div>
-        </>
-      )}
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
+          {renderKPIs()}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {renderCharts()}
+      </div>
     </div>
   );
 }

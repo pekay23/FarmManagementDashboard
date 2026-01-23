@@ -13,7 +13,7 @@ import autoTable from 'jspdf-autotable';
 import { logoBase64 } from "@/lib/logo";
 import { addSvgToPdf } from '@/lib/pdfUtils';
 
-// ✅ SAFE UUID GENERATOR
+// Safe UUID Generator
 function generateUUID() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -51,12 +51,13 @@ export default function SalesReceipts() {
   const taxAmount = subtotal * (Number(settings.tax_rate) / 100);
   const total = subtotal + taxAmount;
 
-  const filteredSales = sales.filter(s => 
+  // ✅ FIX: Added optional chaining to prevent crash if sales is undefined
+  const filteredSales = sales?.filter(s => 
     s.syncStatus !== 'deleted' && (
         s.customer?.toLowerCase().includes(searchQuery.toLowerCase()) || 
         s.id?.toString().includes(searchQuery)
     )
-  );
+  ) || [];
 
   useEffect(() => {
       if (typeof window !== 'undefined') {
@@ -122,17 +123,10 @@ export default function SalesReceipts() {
   }
 
   async function handleRecordSale() {
-    if (!buyerName) {
-        toast.error("Please enter a buyer name");
-        return;
-    }
-    if (cartItems.length === 0) {
-        toast.error("Please add at least one item");
-        return;
-    }
+    if (!buyerName || cartItems.length === 0) return;
 
     const saleData = {
-        id: generateUUID(), // ✅ Fixed: Safe UUID
+        id: generateUUID(),
         customer: buyerName,
         amount: total,
         date: new Date().toISOString(),
@@ -186,53 +180,83 @@ export default function SalesReceipts() {
     toast.success("Settings saved!");
   }
 
+  // ✅ FIX: Updated PDF Generation logic to remove dark boxes
   async function generateReceiptPDF(sale: any) {
     const doc = new jsPDF();
+    const primaryColor: [number, number, number] = [6, 78, 59]; // Dark Teal
     const currency = "GHS";
     
-    doc.setFillColor(20, 184, 166);
-    doc.rect(0, 0, 210, 55, 'F');
+    // Header Block (Solid Color)
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(0, 0, 210, 50, 'F');
     
     if (logoBase64) {
       const svgString = atob(logoBase64.split(',')[1]);
-      await addSvgToPdf(doc, svgString, 15, 10, 35, 35);
+      await addSvgToPdf(doc, svgString, 15, 8, 30, 30);
     }
 
+    // Farm Details (White Text on Teal)
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
-    doc.text(settings.farm_name || "Farm Receipt", 105, 20, { align: "center" });
+    doc.setFont("helvetica", "bold");
+    doc.text(settings.farm_name?.toUpperCase() || "HUGHES FARMS", 55, 25);
     
     doc.setFontSize(10);
-    doc.text(`${settings.phone || ''} | ${settings.email || ''}`, 105, 36, { align: "center" });
-    if (settings.address) doc.text(settings.address, 105, 42, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.text([
+        settings.address || "Farm Location",
+        `Tel: ${settings.phone || "N/A"}`,
+        `Email: ${settings.email || "N/A"}`
+    ], 55, 33);
 
-    doc.setTextColor(0, 0, 0);
+    // Receipt Meta Data (Top Right - White Text)
+    doc.setFontSize(12);
+    doc.text("RECEIPT", 195, 20, { align: "right" });
+    doc.setFontSize(9);
+    doc.text(`No: ${sale.id.toString().slice(0, 8).toUpperCase()}`, 195, 26, { align: "right" });
+    doc.text(`Date: ${new Date(sale.date).toLocaleDateString()}`, 195, 31, { align: "right" });
+
+    // Buyer Section (Black Text on White)
+    doc.setTextColor(40, 40, 40);
     doc.setFontSize(11);
-    doc.text(`Receipt #: ${(sale.id || 'N/A').toString().slice(0, 8).toUpperCase()}`, 14, 70);
-    doc.text(`Date: ${new Date(sale.date).toLocaleDateString()}`, 14, 76);
-    doc.text(`Buyer: ${sale.customer}`, 14, 82);
+    doc.setFont("helvetica", "bold");
+    doc.text("BILL TO:", 15, 65);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text([
+        sale.customer || "Valued Customer",
+        sale.contact_info || "No Contact"
+    ], 15, 72);
 
+    // Items Table
     const items = sale.itemsData || []; 
     autoTable(doc, {
-        startY: 90,
-        head: [['Item', 'Qty', 'Price', 'Total']],
+        startY: 85,
+        head: [['ITEM', 'QTY', 'PRICE', 'TOTAL']],
         body: items.map((i: any) => [ 
             i.name, 
             i.qty, 
-            Number(i.price).toFixed(2), 
-            (Number(i.qty) * Number(i.price)).toFixed(2) 
+            `${Number(i.price).toFixed(2)}`, 
+            `${(Number(i.qty) * Number(i.price)).toFixed(2)}` 
         ]),
         theme: 'grid',
-        headStyles: { fillColor: [20, 184, 166] }
+        headStyles: { fillColor: primaryColor, fontStyle: 'bold' },
+        styles: { cellPadding: 4, fontSize: 10 },
+        alternateRowStyles: { fillColor: [245, 250, 245] }
     });
 
+    // Totals
     let finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFontSize(14);
-    doc.text(`TOTAL: ${currency} ${Number(sale.amount).toFixed(2)}`, 190, finalY, { align: "right" });
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text(`TOTAL: ${currency} ${Number(sale.amount).toFixed(2)}`, 195, finalY + 10, { align: "right" });
 
+    // Footer
     if (settings.receipt_footer) { 
         doc.setFontSize(10); 
-        doc.setTextColor(100, 100, 100); 
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(150, 150, 150); 
         doc.text(settings.receipt_footer, 105, 280, { align: "center" }); 
     }
     
@@ -241,7 +265,6 @@ export default function SalesReceipts() {
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-screen relative pb-20">
-      
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Sales & Receipts</h1>
@@ -322,6 +345,79 @@ export default function SalesReceipts() {
         </div>
       </div>
 
+      {/* --- MODALS --- */}
+      {viewingReceipt && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={() => setViewingReceipt(null)}>
+            <div className="bg-white rounded-xl w-full max-w-sm shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-center font-bold text-lg mb-4">Sale Details</h3>
+                <div className="space-y-3 text-sm">
+                    <div className="flex justify-between border-b pb-2"><span className="text-gray-500">Date:</span> <span>{new Date(viewingReceipt.date).toLocaleString()}</span></div>
+                    <div className="flex justify-between border-b pb-2"><span className="text-gray-500">Buyer:</span> <span>{viewingReceipt.customer}</span></div>
+                    <div className="flex justify-between border-b pb-2"><span className="text-gray-500">Contact:</span> <span>{viewingReceipt.contact_info || 'N/A'}</span></div>
+                </div>
+                <div className="mt-6">
+                    <h4 className="font-bold mb-2">Items</h4>
+                    <div className="space-y-2 border p-3 rounded-lg bg-gray-50">
+                        {viewingReceipt.itemsData?.map((item: any, i: number) => (
+                            <div key={i} className="flex justify-between text-sm">
+                                <span>{item.name} (x{item.qty})</span>
+                                <span className="font-medium">GH₵ {(Number(item.qty) * Number(item.price)).toFixed(2)}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <div className="mt-6 border-t pt-4">
+                    <div className="flex justify-between font-bold text-lg text-gray-900"><span>Total:</span> <span>GH₵ {Number(viewingReceipt.amount).toFixed(2)}</span></div>
+                </div>
+                <div className="flex gap-4 mt-8">
+                    <button onClick={() => setViewingReceipt(null)} className="flex-1 bg-gray-100 py-3 rounded-lg font-medium">Close</button>
+                    <button onClick={() => generateReceiptPDF(viewingReceipt)} className="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2">
+                        <Download className="w-4 h-4" /> Download
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-xl w-full max-w-sm p-6 shadow-2xl text-center animate-in zoom-in-95">
+                <div className="bg-red-50 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                    <AlertTriangle className="w-8 h-8 text-red-500"/>
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Sales?</h3>
+                <p className="text-gray-500 text-sm mb-6">
+                    You are about to delete <strong>{selectedIds.length}</strong> records. 
+                    This action cannot be undone.
+                </p>
+                <div className="flex gap-3">
+                    <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 py-2.5 bg-gray-100 rounded-lg font-bold text-gray-600 hover:bg-gray-200">Cancel</button>
+                    <button onClick={executeBulkDelete} className="flex-1 py-2.5 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700">Delete</button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {isSettingsOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-xl w-full max-w-md shadow-2xl p-6 animate-in zoom-in-95">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">Receipt Settings</h2>
+                    <button onClick={() => setIsSettingsOpen(false)}><X className="text-gray-400" /></button>
+                </div>
+                <form onSubmit={handleSaveSettings} className="space-y-4">
+                    <input name="farm_name" required defaultValue={settings.farm_name} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Farm Name"/>
+                    <input name="phone" defaultValue={settings.phone} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Phone"/>
+                    <input name="email" defaultValue={settings.email} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Email"/>
+                    <input name="address" defaultValue={settings.address} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Address"/>
+                    <input name="footer" defaultValue={settings.receipt_footer} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Footer Message"/>
+                    <input name="tax" type="number" defaultValue={settings.tax_rate} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Tax Rate (%)"/>
+                    <button className="w-full bg-gray-900 text-white py-2 rounded font-bold">Save Settings</button>
+                </form>
+            </div>
+        </div>
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95">
@@ -399,78 +495,6 @@ export default function SalesReceipts() {
                 <button onClick={handleRecordSale} className="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-lg font-bold">Record Sale</button>
             </div>
           </div>
-        </div>
-      )}
-      
-      {viewingReceipt && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={() => setViewingReceipt(null)}>
-            <div className="bg-white rounded-xl w-full max-w-sm shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
-                <h3 className="text-center font-bold text-lg mb-4">Sale Details</h3>
-                <div className="space-y-3 text-sm">
-                    <div className="flex justify-between border-b pb-2"><span className="text-gray-500">Date:</span> <span>{new Date(viewingReceipt.date).toLocaleString()}</span></div>
-                    <div className="flex justify-between border-b pb-2"><span className="text-gray-500">Buyer:</span> <span>{viewingReceipt.customer}</span></div>
-                    <div className="flex justify-between border-b pb-2"><span className="text-gray-500">Contact:</span> <span>{viewingReceipt.contact_info || 'N/A'}</span></div>
-                </div>
-                <div className="mt-6">
-                    <h4 className="font-bold mb-2">Items</h4>
-                    <div className="space-y-2 border p-3 rounded-lg bg-gray-50">
-                        {viewingReceipt.itemsData?.map((item: any, i: number) => (
-                            <div key={i} className="flex justify-between text-sm">
-                                <span>{item.name} (x{item.qty})</span>
-                                <span className="font-medium">GH₵ {(Number(item.qty) * Number(item.price)).toFixed(2)}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-                <div className="mt-6 border-t pt-4">
-                    <div className="flex justify-between font-bold text-lg text-gray-900"><span>Total:</span> <span>GH₵ {Number(viewingReceipt.amount).toFixed(2)}</span></div>
-                </div>
-                <div className="flex gap-4 mt-8">
-                    <button onClick={() => setViewingReceipt(null)} className="flex-1 bg-gray-100 py-3 rounded-lg font-medium">Close</button>
-                    <button onClick={() => generateReceiptPDF(viewingReceipt)} className="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2">
-                        <Download className="w-4 h-4" /> Download
-                    </button>
-                </div>
-            </div>
-        </div>
-      )}
-
-      {isDeleteModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-xl w-full max-w-sm p-6 shadow-2xl text-center animate-in zoom-in-95">
-                <div className="bg-red-50 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                    <AlertTriangle className="w-8 h-8 text-red-500"/>
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Sales?</h3>
-                <p className="text-gray-500 text-sm mb-6">
-                    You are about to delete <strong>{selectedIds.length}</strong> records. 
-                    This action cannot be undone.
-                </p>
-                <div className="flex gap-3">
-                    <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 py-2.5 bg-gray-100 rounded-lg font-bold text-gray-600 hover:bg-gray-200">Cancel</button>
-                    <button onClick={executeBulkDelete} className="flex-1 py-2.5 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700">Delete</button>
-                </div>
-            </div>
-        </div>
-      )}
-
-      {isSettingsOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-xl w-full max-w-md shadow-2xl p-6 animate-in zoom-in-95">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">Receipt Settings</h2>
-                    <button onClick={() => setIsSettingsOpen(false)}><X className="text-gray-400" /></button>
-                </div>
-                <form onSubmit={handleSaveSettings} className="space-y-4">
-                    <input name="farm_name" required defaultValue={settings.farm_name} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Farm Name"/>
-                    <input name="phone" defaultValue={settings.phone} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Phone"/>
-                    <input name="email" defaultValue={settings.email} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Email"/>
-                    <input name="address" defaultValue={settings.address} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Address"/>
-                    <input name="footer" defaultValue={settings.receipt_footer} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Footer Message"/>
-                    <input name="tax" type="number" defaultValue={settings.tax_rate} className="w-full border p-2 rounded outline-none focus:border-primary-500" placeholder="Tax Rate (%)"/>
-                    <button className="w-full bg-gray-900 text-white py-2 rounded font-bold">Save Settings</button>
-                </form>
-            </div>
         </div>
       )}
     </div>
