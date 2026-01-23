@@ -30,8 +30,9 @@ export default function LoginPage() {
       setError('Invalid email or password');
       setLoading(false);
     } else {
-      router.push('/'); 
-      router.refresh();
+      // ✅ FIX: Use window.location.href instead of router.push
+      // This forces a hard reload, ensuring the Middleware sees the new Auth Cookie immediately.
+      window.location.href = '/'; 
     }
   }
 
@@ -80,7 +81,7 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Password</label>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Password</label>
             <div className="relative">
               <Lock className="w-5 h-5 text-gray-400 absolute left-3 top-3" />
               <input 
