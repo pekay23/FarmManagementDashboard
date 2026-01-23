@@ -20,9 +20,8 @@ export async function POST(request: Request) {
     const { 
       plot_number, crop_type, variety, planting_date, 
       expected_harvest_date, plot_size_acres, location, estimated_yield_kg,
-      status // <--- Accept status from body
+      status
     } = body;
-
     const query = `
       INSERT INTO crops (
         plot_number, crop_type, variety, planting_date, 
@@ -32,13 +31,11 @@ export async function POST(request: Request) {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
       RETURNING *
     `;
-
     const values = [
       plot_number, crop_type, variety, planting_date, 
       expected_harvest_date, plot_size_acres, location, estimated_yield_kg, 
-      status || 'Growing' // <--- Use body status or default to Capitalized
+      status || 'Growing'
     ];
-
     const result = await client.query(query, values);
     return NextResponse.json(result.rows[0]);
   } catch (error) {
@@ -58,7 +55,6 @@ export async function PUT(request: Request) {
       plot_size_acres, location, estimated_yield_kg, status, 
       actual_yield_kg, harvest_notes 
     } = body;
-
     const query = `
       UPDATE crops
       SET plot_number = $1,
@@ -75,13 +71,11 @@ export async function PUT(request: Request) {
       WHERE id = $12
       RETURNING *
     `;
-
     const values = [
       plot_number, crop_type, variety, planting_date, expected_harvest_date,
       plot_size_acres, location, estimated_yield_kg, actual_yield_kg, 
       harvest_notes, status, id
     ];
-
     const result = await client.query(query, values);
     return NextResponse.json(result.rows[0]);
   } catch (error) {
@@ -89,4 +83,33 @@ export async function PUT(request: Request) {
   } finally {
     client.release();
   }
+}
+
+// ✅ DELETE HANDLER ADDED
+export async function DELETE(request: Request) {
+    const client = await pool.connect();
+    try {
+        const { id } = await request.json();
+        if (!id) {
+            return NextResponse.json({ error: 'ID is required' }, { status: 400 });
+        }
+
+        await client.query('BEGIN');
+        
+        // Delete associated treatments first to prevent foreign key errors
+        await client.query('DELETE FROM crop_treatments WHERE crop_id = $1', [id]);
+        
+        // Then delete the crop record
+        await client.query('DELETE FROM crops WHERE id = $1', [id]);
+        
+        await client.query('COMMIT');
+
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Delete crop error:', error);
+        return NextResponse.json({ error: 'Failed to delete crop' }, { status: 500 });
+    } finally {
+        client.release();
+    }
 }

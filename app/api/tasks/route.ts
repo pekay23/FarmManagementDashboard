@@ -66,9 +66,7 @@ export async function POST(request: Request) {
     const newTask = result.rows[0];
 
     if (assigned_to_ids && Array.isArray(assigned_to_ids) && assigned_to_ids.length > 0) {
-      // ✅ FIX: Deduplicate and filter invalid IDs
       const uniqueEmpIds = [...new Set(assigned_to_ids)].filter(Boolean);
-      
       for (const empId of uniqueEmpIds) {
         await client.query('INSERT INTO task_assignments (task_id, employee_id) VALUES ($1, $2)', [newTask.id, empId]);
       }
@@ -78,9 +76,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ...newTask, success: true }); 
 
   } catch (error: any) {
-    // ✅ FIX: Safe Rollback
     try { await client.query('ROLLBACK'); } catch (e) { console.error('Rollback failed:', e); }
-    
     console.error('Create task error:', error);
     return NextResponse.json({ error: error.message || 'Failed to add task' }, { status: 500 });
   } finally {
@@ -89,54 +85,53 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const client = await pool.connect();
+ const client = await pool.connect();
   try {
     const body = await request.json();
     const { id, status, title, description, assigned_to_ids, due_date, priority, category } = body;
 
-    if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
+    if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
     await client.query('BEGIN');
 
-    let updatedTask;
+    // ✅ FIX: Simplified to a single, comprehensive UPDATE query
+    const updateQuery = `
+      UPDATE tasks 
+      SET 
+        title = $1, 
+        description = $2, 
+        due_date = $3, 
+        priority = $4, 
+        category = $5, 
+        status = $6 
+      WHERE id = $7
+      RETURNING *
+    `;
+    const res = await client.query(updateQuery, [
+        title, 
+        description, 
+        due_date, 
+        priority?.toLowerCase(), 
+        category || 'General', 
+        status?.toLowerCase(), // Ensure status is updated
+        id
+    ]);
+    const updatedTask = res.rows[0];
 
-    if (status && !title) {
-      const dbStatus = status.toLowerCase();
-      const res = await client.query('UPDATE tasks SET status = $1 WHERE id = $2 RETURNING *', [dbStatus, id]);
-      updatedTask = res.rows[0];
-    } else {
-      const dbPriority = priority?.toLowerCase();
-      const dbCategory = category || 'General';
-      
-      const updateQuery = `
-        UPDATE tasks 
-        SET title=$1, description=$2, due_date=$3, priority=$4, category=$5 
-        WHERE id=$6
-        RETURNING *
-      `;
-      const res = await client.query(updateQuery, [title, description, due_date, dbPriority, dbCategory, id]);
-      updatedTask = res.rows[0];
-
-      // Re-do Assignments
-      await client.query('DELETE FROM task_assignments WHERE task_id = $1', [id]);
-      
-      if (assigned_to_ids && Array.isArray(assigned_to_ids) && assigned_to_ids.length > 0) {
-        // ✅ FIX: Deduplicate and filter invalid IDs
+    // Re-do Assignments if they are provided
+    if (assigned_to_ids && Array.isArray(assigned_to_ids)) {
+        await client.query('DELETE FROM task_assignments WHERE task_id = $1', [id]);
         const uniqueEmpIds = [...new Set(assigned_to_ids)].filter(Boolean);
-
         for (const empId of uniqueEmpIds) {
           await client.query('INSERT INTO task_assignments (task_id, employee_id) VALUES ($1, $2)', [id, empId]);
         }
-      }
     }
 
     await client.query('COMMIT');
     return NextResponse.json({ ...updatedTask, success: true });
 
   } catch (error) {
-    // ✅ FIX: Safe Rollback
     try { await client.query('ROLLBACK'); } catch (e) { console.error('Rollback failed:', e); }
-    
     console.error('Update task error:', error);
     return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
   } finally {
@@ -144,6 +139,7 @@ export async function PUT(request: Request) {
   }
 }
 
+// ✅ DELETE HANDLER ADDED
 export async function DELETE(request: Request) {
   const client = await pool.connect();
   try {
