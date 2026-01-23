@@ -30,7 +30,6 @@ export default function OfflineSync() {
   }, []);
 
   // --- MAPPERS ---
-
   const mapEmployeeToLocal = (serverItem: any) => ({
       ...serverItem,
       name: serverItem.full_name || serverItem.name,
@@ -79,7 +78,7 @@ export default function OfflineSync() {
             fetch('/api/tasks').then(r => r.json()),
             fetch('/api/sales').then(r => r.json()),
             fetch('/api/employees').then(r => r.json()),
-            fetch('/api/expenses').then(r => r.json()) // <--- NEW
+            fetch('/api/expenses').then(r => r.json())
         ]);
 
         await db.transaction('rw', [db.crops, db.livestock, db.inventory, db.tasks, db.sales, db.employees, db.expenses], async () => {
@@ -93,7 +92,6 @@ export default function OfflineSync() {
             // Sync Expenses
             if (Array.isArray(expenses)) await db.expenses.bulkPut(expenses.map(mapExpenseToLocal));
         });
-
         console.log("✅ Sync complete");
     } catch (error) {
         console.error("Pull failed:", error);
@@ -115,10 +113,14 @@ export default function OfflineSync() {
               contact_info: emp.phone,
               status: emp.isActive ? 'Active' : 'Inactive'
           };
-          const method = emp.id && emp.id < 1000000000000 ? 'PUT' : 'POST'; 
+          
+          // ✅ FIX: Use syncStatus to determine method
+          const method = emp.syncStatus === 'updated' ? 'PUT' : 'POST'; 
+          
           const res = await fetch('/api/employees', {
               method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
           });
+
           if (res.ok) {
               const serverData = await res.json();
               if (method === 'POST' && serverData.id) {
@@ -155,7 +157,7 @@ export default function OfflineSync() {
             status: task.status
         };
         
-        const method = task.id && task.id < 1000000000000 ? 'PUT' : 'POST';
+        const method = task.syncStatus === 'updated' ? 'PUT' : 'POST';
         const res = await fetch('/api/tasks', {
           method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
         });
@@ -175,10 +177,16 @@ export default function OfflineSync() {
               unit_price: item.unitPrice,
               last_updated: item.updatedAt
           };
-          const method = item.id && item.id < 1000000000000 ? 'PUT' : 'POST'; 
-          const res = await fetch(method === 'POST' ? '/api/inventory' : `/api/inventory/${item.id}`, {
+          
+          const method = item.syncStatus === 'updated' ? 'PUT' : 'POST';
+          const endpoint = method === 'PUT' ? `/api/inventory` : '/api/inventory'; // Ensure correct endpoint logic if needed, but standard POST usually handles both or standard REST uses ID
+
+          // Note: Standard REST puts update at /api/inventory (if body has ID) or /api/inventory/ID
+          // Adjust based on your API. Assuming body has ID is enough for your PUT route:
+          const res = await fetch('/api/inventory', {
               method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
           });
+
           if (res.ok) {
               const serverData = await res.json();
               if (method === 'POST' && serverData.id) {
@@ -193,10 +201,11 @@ export default function OfflineSync() {
       // 4. CROPS
       const pendingCrops = await db.crops.where('syncStatus').notEqual('synced').toArray();
       for (const crop of pendingCrops) {
-        const method = crop.createdAt === crop.updatedAt ? 'POST' : 'PUT';
+        const method = crop.syncStatus === 'updated' ? 'PUT' : 'POST';
         const res = await fetch('/api/crops', {
           method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(crop)
         });
+
         if (res.ok) {
             const serverData = await res.json();
             if (method === 'POST' && serverData.id) {
