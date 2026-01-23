@@ -1,21 +1,9 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { compare } from "bcryptjs";
-import { Pool } from 'pg';
-
-const pool = new Pool({ 
-  connectionString: process.env.DATABASE_URL,
-  ssl: true 
-});
+import pool from "@/lib/pg";
+import bcrypt from "bcryptjs";
 
 export const authOptions: NextAuthOptions = {
-  session: { 
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
-  pages: {
-    signIn: '/login',
-  },
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -28,27 +16,63 @@ export const authOptions: NextAuthOptions = {
 
         const client = await pool.connect();
         try {
-          const result = await client.query("SELECT * FROM users WHERE email = $1", [credentials.email]);
+          console.log("🔍 Attempting login for:", credentials.email);
+
+          // Use LOWER() to ensure case-insensitivity
+          const result = await client.query("SELECT * FROM users WHERE LOWER(email) = LOWER($1)", [credentials.email]);
           const user = result.rows[0];
 
-          if (!user) return null;
+          if (!user) {
+            console.log("❌ User not found in database.");
+            return null;
+          }
 
-          const isValid = await compare(credentials.password, user.password);
+          console.log("✅ User found. Comparing passwords...");
+          
+          const isPasswordCorrect = await bcrypt.compare(credentials.password, user.password);
 
-          if (!isValid) return null;
+          if (!isPasswordCorrect) {
+            console.log("❌ Password mismatch.");
+            return null;
+          }
 
-          return { 
-            id: user.id, 
-            name: user.name, 
-            email: user.email 
+          console.log("🎉 Login successful! Role:", user.role);
+
+          return {
+            id: user.id,
+            email: user.email,
+            role: user.role,
           };
         } catch (error) {
-          console.error("Login error:", error);
+          console.error("🔥 Auth Error:", error);
           return null;
         } finally {
           client.release();
         }
+      },
+    }),
+  ],
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.role = (user as any).role;
+        token.id = (user as any).id;
       }
-    })
-  ]
+      return token;
+    },
+    async session({ session, token }) {
+      if (token && session.user) {
+        (session.user as any).role = token.role;
+        (session.user as any).id = token.id;
+      }
+      return session;
+    },
+  },
+  pages: {
+    signIn: "/login",
+  },
+  session: {
+    strategy: "jwt",
+  },
+  secret: process.env.NEXTAUTH_SECRET,
 };

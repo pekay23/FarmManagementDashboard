@@ -3,16 +3,21 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from 'next-auth/react'; // ✅ Import useSession
 import SyncStatus from "@/components/SyncStatus";
 import { logoBase64 } from "@/lib/logo";
 import { 
   Menu, X, Home, Tractor, Settings, Beef, Package, 
-  Users, ClipboardList, DollarSign, BarChart3, TrendingDown 
+  Users, ClipboardList, DollarSign, BarChart3, TrendingDown,
+  Shield // ✅ Added Shield
 } from "lucide-react";
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
+  
+  // ✅ Get the session data inside the component
+  const { data: session } = useSession(); 
 
   const links = [
     { name: "Dashboard", href: "/", icon: Home },
@@ -45,7 +50,7 @@ export default function Sidebar() {
         className={`fixed top-0 left-0 h-full bg-gradient-to-b from-emerald-900 to-teal-900 text-white transition-transform duration-300 z-40 w-64 flex flex-col shadow-2xl
         ${isOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 pt-20 md:pt-0`}
       >
-        {/* Brand Section - Compact Height to match Dashboard Header */}
+        {/* Brand Section */}
         <div className="flex items-center gap-3 px-6 py-6 border-b border-white/10 bg-emerald-950/20">
            <div className="bg-white/10 p-2 rounded-xl backdrop-blur-sm shadow-sm border border-white/5">
              <img 
@@ -59,7 +64,7 @@ export default function Sidebar() {
            </div>
         </div>
 
-        {/* Navigation Links - Scrollbar Hidden */}
+        {/* Navigation Links */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5 
           [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           
@@ -81,6 +86,24 @@ export default function Sidebar() {
               </Link>
             );
           })}
+
+          {/* ✅ ADMIN SECTION: Only visible to Admins */}
+          {(session?.user as any)?.role === 'Admin' && (
+            <div className="pt-2 mt-2 border-t border-white/10">
+                <Link 
+                    href="/admin/users" 
+                    onClick={() => setIsOpen(false)} 
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium ${
+                    pathname === '/admin/users'
+                        ? "bg-purple-100 text-purple-900 shadow-lg font-bold translate-x-1" 
+                        : "text-purple-200/80 hover:bg-white/10 hover:text-white hover:translate-x-1"
+                    }`}
+                >
+                    <Shield className={`w-5 h-5 ${pathname === '/admin/users' ? "text-purple-700" : "text-purple-300/70"}`} />
+                    User Accounts
+                </Link>
+            </div>
+          )}
         </nav>
 
         {/* Sync Status Footer */}
