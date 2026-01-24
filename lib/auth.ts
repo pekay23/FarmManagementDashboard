@@ -13,42 +13,26 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
-
         const client = await pool.connect();
         try {
-          console.log("🔍 Attempting login for:", credentials.email);
-
-          // 1. Fetch User AND farm_id
+          // ✅ Fetch farm_id AND the new is_superadmin flag
           const result = await client.query(
-            "SELECT id, email, password, role, farm_id FROM users WHERE LOWER(email) = LOWER($1)", 
+            "SELECT id, email, password, farm_id, is_superadmin FROM users WHERE LOWER(email) = LOWER($1)", 
             [credentials.email]
           );
           const user = result.rows[0];
 
-          if (!user) {
-            console.log("❌ User not found.");
-            return null;
-          }
+          if (!user) return null;
 
           const isPasswordCorrect = await bcrypt.compare(credentials.password, user.password);
-
-          if (!isPasswordCorrect) {
-            console.log("❌ Password mismatch.");
-            return null;
-          }
-
-          console.log("🎉 Login successful!", user.email, "Farm:", user.farm_id);
-
-          // 2. Return object with farm_id
+          if (!isPasswordCorrect) return null;
+          
           return {
             id: user.id,
             email: user.email,
-            role: user.role,
-            farm_id: user.farm_id, // <--- CRITICAL
+            farm_id: user.farm_id,
+            is_superadmin: user.is_superadmin, // ✅ Return is_superadmin
           };
-        } catch (error) {
-          console.error("🔥 Auth Error:", error);
-          return null;
         } finally {
           client.release();
         }
@@ -56,21 +40,19 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    // 3. Persist farm_id to the Token
     async jwt({ token, user }) {
       if (user) {
-        token.role = (user as any).role;
         token.id = (user as any).id;
-        token.farm_id = (user as any).farm_id; // <--- CRITICAL
+        token.farm_id = (user as any).farm_id;
+        token.is_superadmin = (user as any).is_superadmin; // ✅ Pass to token
       }
       return token;
     },
-    // 4. Persist farm_id to the Session (so APIs can see it)
     async session({ session, token }) {
       if (token && session.user) {
-        (session.user as any).role = token.role;
         (session.user as any).id = token.id;
-        (session.user as any).farm_id = token.farm_id; // <--- CRITICAL
+        (session.user as any).farm_id = token.farm_id;
+        (session.user as any).is_superadmin = token.is_superadmin; // ✅ Pass to session
       }
       return session;
     },

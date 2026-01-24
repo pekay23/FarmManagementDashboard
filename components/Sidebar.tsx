@@ -1,63 +1,85 @@
 "use client";
 
-import { useState, useEffect } from "react"; // ✅ Added useEffect
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession, signOut } from 'next-auth/react'; 
+import { useSession, signOut } from 'next-auth/react';
 import SyncStatus from "@/components/SyncStatus";
-import { logoBase64 } from "@/lib/logo"; // Default logo
+import { logoBase64 } from "@/lib/logo";
 import { 
   Menu, X, Home, Tractor, Settings, Beef, Package, 
   Users, ClipboardList, DollarSign, BarChart3, TrendingDown,
-  Shield, LogOut 
+  Shield, LogOut, LayoutDashboard
 } from "lucide-react";
+
+// ✅ LINKS FOR REGULAR FARM USERS
+const farmLinks = [
+  { name: "Dashboard", href: "/", icon: Home },
+  { name: "Livestock", href: "/livestock", icon: Beef },
+  { name: "Crops", href: "/crops", icon: Tractor },
+  { name: "Inventory", href: "/inventory", icon: Package },
+  { name: "Employees", href: "/employees", icon: Users },
+  { name: "Tasks", href: "/tasks", icon: ClipboardList },
+  { name: "Expenses", href: "/expenses", icon: TrendingDown },
+  { name: "Sales", href: "/sales", icon: DollarSign },
+  { name: "Reports", href: "/reports", icon: BarChart3 },
+  { name: "Settings", href: "/settings", icon: Settings },
+];
+
+// ✅ LINKS FOR THE SUPER ADMIN
+const superAdminLinks = [
+    { name: "Platform Dashboard", href: "/", icon: LayoutDashboard },
+    { name: "Farm Management", href: "/admin/users", icon: Shield },
+];
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const { data: session } = useSession(); 
+
+  // Determine user type and which links to show
+  const isSuperAdmin = (session?.user as any)?.is_superadmin;
+  const links = isSuperAdmin ? superAdminLinks : farmLinks;
   
-  // ✅ State for Dynamic Branding
   const [brand, setBrand] = useState({ name: 'Hughes Farms', logo: '' });
 
-    // ✅ Fetch dynamic branding on mount (No Cache)
   useEffect(() => {
-      fetch('/api/settings', { cache: 'no-store' }) // <--- Added { cache: 'no-store' }
-        .then(res => res.json())
-        .then(data => {
-            if (data.farm_name) {
-                setBrand({ 
-                    name: data.farm_name, 
-                    logo: data.logo || '' 
-                });
-            }
-        })
-        .catch(err => console.error("Failed to load brand"));
-  }, []);
+      // Only fetch custom branding for regular farm users
+      if (session && !isSuperAdmin) {
+        fetch('/api/settings', { cache: 'no-store' })
+          .then(res => res.json())
+          .then(data => {
+              if (data.farm_name) {
+                  setBrand({ 
+                      name: data.farm_name, 
+                      logo: data.logo || '' 
+                  });
+              }
+          })
+          .catch(err => console.error("Failed to load brand settings"));
+      } else if (isSuperAdmin) {
+          // Super Admins see the default app branding
+          setBrand({ name: 'Platform Admin', logo: logoBase64 });
+      }
+  }, [session, isSuperAdmin]); 
 
-  const links = [
-    { name: "Dashboard", href: "/", icon: Home },
-    { name: "Livestock", href: "/livestock", icon: Beef },
-    { name: "Crops", href: "/crops", icon: Tractor },
-    { name: "Inventory", href: "/inventory", icon: Package },
-    { name: "Employees", href: "/employees", icon: Users },
-    { name: "Tasks", href: "/tasks", icon: ClipboardList },
-    { name: "Expenses", href: "/expenses", icon: TrendingDown },
-    { name: "Sales", href: "/sales", icon: DollarSign },
-    { name: "Reports", href: "/reports", icon: BarChart3 },
-    { name: "Settings", href: "/settings", icon: Settings },
-  ];
+  if (pathname === '/login') return null;
 
   return (
     <>
-      {/* Mobile Header */}
+      <style jsx global>{`
+        .modern-scrollbar::-webkit-scrollbar { width: 5px; }
+        .modern-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .modern-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, 0.1); border-radius: 20px; }
+        .modern-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, 0.3); }
+      `}</style>
+
       <div className="md:hidden fixed top-0 left-0 w-full bg-emerald-900 z-50 p-4 border-b border-white/10 flex justify-between items-center text-white shadow-md">
         <div className="flex items-center gap-3">
-            {/* ✅ Dynamic Mobile Logo */}
             {brand.logo ? (
                 <img src={brand.logo} alt="Logo" className="w-8 h-8 object-contain drop-shadow-md" />
             ) : (
-                <img src={logoBase64} alt="Logo" className="w-8 h-8 object-contain drop-shadow-md" />
+                <span className="text-2xl">🚜</span>
             )}
             <span className="font-bold text-lg tracking-wide">{brand.name}</span>
         </div>
@@ -66,33 +88,21 @@ export default function Sidebar() {
         </button>
       </div>
 
-      {/* Sidebar Container */}
       <aside 
         className={`fixed top-0 left-0 h-full bg-gradient-to-b from-emerald-900 to-teal-900 text-white transition-transform duration-300 z-40 w-64 flex flex-col shadow-2xl
         ${isOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 pt-20 md:pt-0`}
       >
-        {/* Brand Section */}
         <div className="flex items-center gap-3 px-6 py-6 border-b border-white/10 bg-emerald-950/20">
            <div className="bg-white/10 p-2 rounded-xl backdrop-blur-sm shadow-sm border border-white/5">
-             {/* ✅ Dynamic Sidebar Logo */}
              {brand.logo ? (
-                 <img 
-                   src={brand.logo} 
-                   className="w-10 h-10 object-contain drop-shadow-md" 
-                   alt="Farm Logo"
-                 />
+                 <img src={brand.logo} className="w-10 h-10 object-contain drop-shadow-md" alt="Farm Logo"/>
              ) : (
-                 <img 
-                   src={logoBase64} 
-                   className="w-10 h-10 object-contain drop-shadow-md" 
-                   alt="Hughes Farms Logo"
-                 />
+                 <div className="w-10 h-10 flex items-center justify-center text-2xl">🚜</div>
              )}
            </div>
            <div>
-             {/* ✅ Dynamic Farm Name */}
              <h1 className="font-bold text-lg leading-tight tracking-wide text-white">
-                {brand.name === 'Hughes Farms' ? (
+                {brand.name === 'Hughes Farms' || isSuperAdmin ? (
                     <>Hughes<br/>Farms</>
                 ) : (
                     brand.name
@@ -101,63 +111,44 @@ export default function Sidebar() {
            </div>
         </div>
 
-        {/* Navigation Links */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5 
-          [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        {/* ✅ FIX: Corrected className string syntax */}
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           
           {links.map((link) => {
             const isActive = pathname === link.href;
+            const style = isSuperAdmin
+              ? (isActive ? 'bg-purple-100 text-purple-900 shadow-lg' : 'text-purple-200/80 hover:bg-white/10')
+              : (isActive ? 'bg-white text-emerald-900 shadow-lg' : 'text-emerald-100/80 hover:bg-white/10');
+            
             return (
               <Link 
                 key={link.name} 
                 href={link.href} 
                 onClick={() => setIsOpen(false)} 
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium ${
-                  isActive 
-                    ? "bg-white text-emerald-900 shadow-lg font-bold translate-x-1" 
-                    : "text-emerald-100/80 hover:bg-white/10 hover:text-white hover:translate-x-1"
-                }`}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium ${style}`}
               >
-                <link.icon className={`w-5 h-5 ${isActive ? "text-emerald-700" : "text-emerald-200/70"}`} />
-                {link.name}
+                <link.icon className={`w-5 h-5 shrink-0 ${isActive ? (isSuperAdmin ? 'text-purple-700' : 'text-emerald-700') : (isSuperAdmin ? 'text-purple-300/70' : 'text-emerald-200/70')}`} />
+                <span>{link.name}</span>
               </Link>
             );
           })}
-
-          {/* ADMIN SECTION */}
-          {(session?.user as any)?.role === 'Admin' && (
-            <div className="pt-2 mt-2 border-t border-white/10">
-                <Link 
-                    href="/admin/users" 
-                    onClick={() => setIsOpen(false)} 
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium ${
-                    pathname === '/admin/users'
-                        ? "bg-purple-100 text-purple-900 shadow-lg font-bold translate-x-1" 
-                        : "text-purple-200/80 hover:bg-white/10 hover:text-white hover:translate-x-1"
-                    }`}
-                >
-                    <Shield className={`w-5 h-5 ${pathname === '/admin/users' ? "text-purple-700" : "text-purple-300/70"}`} />
-                    User Accounts
-                </Link>
-            </div>
-          )}
         </nav>
 
-        {/* Footer Area with Sign Out and Sync Status */}
-        <div className="p-4 bg-black/20 border-t border-white/5 space-y-3">
-            <button 
-                onClick={() => signOut({ callbackUrl: '/login' })}
-                className="flex w-full items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium text-red-200 hover:bg-red-900/20 hover:text-white transition-colors"
-            >
-                <LogOut className="w-5 h-5" />
-                Sign Out
-            </button>
-
-            <SyncStatus />
+        <div className="p-3 border-t border-green-800/50">
+          <button 
+            onClick={() => signOut({ redirect: true, callbackUrl: '/login' })}
+            className="flex w-full items-center space-x-3 px-4 py-3 text-sm font-semibold rounded-lg text-red-300 hover:bg-red-900/30 hover:text-red-200 transition-all duration-200 mb-2"
+          >
+            <LogOut className="w-5 h-5 shrink-0" />
+            <span>Sign Out</span>
+          </button>
+          
+          <div className="px-4 text-xs text-green-300/60 pb-4">
+             <SyncStatus />
+          </div>
         </div>
       </aside>
-
-      {/* Mobile Overlay */}
+      
       {isOpen && (
         <div className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-sm" onClick={() => setIsOpen(false)} />
       )}

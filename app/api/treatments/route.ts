@@ -5,50 +5,63 @@ import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-async function getFarmId() {
+async function getSessionInfo() {
   const session = await getServerSession(authOptions);
-  if (!session || !(session.user as any).farm_id) {
-    throw new Error('Unauthorized');
-  }
-  return (session.user as any).farm_id;
+  if (!session) throw new Error('Unauthorized');
+  return {
+    farm_id: (session.user as any).farm_id,
+    is_superadmin: (session.user as any).is_superadmin
+  };
 }
 
-// GET treatments
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const crop_id = searchParams.get('crop_id');
-  const client = await pool.connect();
   
+  // ✅ FIX: Use pool.query() directly instead of pool.connect()
   try {
-    const farm_id = await getFarmId(); // 🔒 Secure check
-    let query = 'SELECT * FROM crop_treatments WHERE farm_id = $1 ORDER BY treatment_date DESC';
-    let values: any[] = [farm_id];
+    const { farm_id, is_superadmin } = await getSessionInfo();
 
-    // Only filter if crop_id is provided AND it's not "ALL"
-    if (crop_id && crop_id !== 'ALL') {
-        query = 'SELECT * FROM crop_treatments WHERE farm_id = $1 AND crop_id = $2 ORDER BY treatment_date DESC';
-        values = [farm_id, crop_id];
+    let query = '';
+    let values: any[] = [];
+
+    if (is_superadmin) {
+        if (crop_id && crop_id !== 'ALL') {
+            query = 'SELECT * FROM crop_treatments WHERE crop_id = $1 ORDER BY treatment_date DESC';
+            values = [crop_id];
+        } else {
+            query = 'SELECT * FROM crop_treatments ORDER BY treatment_date DESC';
+        }
+    } else {
+        if (!farm_id) throw new Error('Unauthorized');
+        
+        if (crop_id && crop_id !== 'ALL') {
+            query = 'SELECT * FROM crop_treatments WHERE farm_id = $1 AND crop_id = $2 ORDER BY treatment_date DESC';
+            values = [farm_id, crop_id];
+        } else {
+            query = 'SELECT * FROM crop_treatments WHERE farm_id = $1 ORDER BY treatment_date DESC';
+            values = [farm_id];
+        }
     }
 
-    const result = await client.query(query, values);
+    const result = await pool.query(query, values);
     return NextResponse.json(result.rows);
   } catch (error: any) {
     console.error('Fetch treatments error:', error);
     return NextResponse.json({ error: 'Failed to fetch treatments' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
-  } finally {
-    client.release();
   }
 }
 
-// ADD a new treatment
+// POST remains unchanged as it requires a transaction
 export async function POST(request: Request) {
   const client = await pool.connect();
   try {
-    const farm_id = await getFarmId(); // 🔒 Secure check
+    const { farm_id } = await getSessionInfo();
+    if (!farm_id) throw new Error('Unauthorized'); 
+
     const body = await request.json();
     const { crop_id, treatment_type, product_name, treatment_date, quantity, cost, notes } = body;
 
-    // Verify crop ownership first
     const check = await client.query('SELECT id FROM crops WHERE id = $1 AND farm_id = $2', [crop_id, farm_id]);
     if (check.rowCount === 0) {
         return NextResponse.json({ error: 'Crop not found or access denied' }, { status: 404 });

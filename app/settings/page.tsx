@@ -254,7 +254,9 @@ export default function SettingsPage() {
                       <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                           <p className="text-xs text-gray-500 uppercase font-bold mb-1">Logged in as</p>
                           <p className="text-lg font-medium text-gray-900">{session?.user?.email || 'Offline User'}</p>
-                          <p className="text-sm text-gray-500 mt-1">Role: <span className="font-semibold text-primary-700">{(session?.user as any)?.role || 'Viewer'}</span></p>
+                          <p className="text-sm text-gray-500 mt-1">Role: <span className="font-semibold text-primary-700">{(session?.user as any)?.is_superadmin ? 'Super Admin' : 'Farm Owner'}
+</span></p>
+
                       </div>
                       <div className="flex gap-4 pt-2">
                           <button onClick={() => window.location.href='/profile'} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors">

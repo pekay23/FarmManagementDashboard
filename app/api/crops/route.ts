@@ -5,36 +5,47 @@ import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-// Helper to get secure Farm ID
-async function getFarmId() {
+// ✅ Helper to check Session & Role
+async function getSessionInfo() {
   const session = await getServerSession(authOptions);
-  if (!session || !(session.user as any).farm_id) {
-    throw new Error('Unauthorized');
-  }
-  return (session.user as any).farm_id;
+  if (!session) throw new Error('Unauthorized');
+  
+  return {
+    farm_id: (session.user as any).farm_id,
+    is_superadmin: (session.user as any).is_superadmin
+  };
 }
 
 export async function GET() {
-  const client = await pool.connect();
+  // ✅ OPTIMIZED
   try {
-    const farm_id = await getFarmId(); // 🔒 Secure check
+    const { farm_id, is_superadmin } = await getSessionInfo();
 
-    const result = await client.query(
-      'SELECT * FROM crops WHERE farm_id = $1 ORDER BY planting_date DESC', 
-      [farm_id]
-    );
+    let query = 'SELECT * FROM crops';
+    let values: any[] = [];
+
+    if (!is_superadmin) {
+        query += ' WHERE farm_id = $1';
+        values.push(farm_id);
+    }
+    
+    query += ' ORDER BY planting_date DESC';
+
+    const result = await pool.query(query, values);
     return NextResponse.json(result.rows);
   } catch (error: any) {
     return NextResponse.json({ error: 'Failed' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
-  } finally {
-    client.release();
   }
 }
 
+
+// POST: Strict Farm Owner Only (Super Admin doesn't create farm data directly)
 export async function POST(request: Request) {
   const client = await pool.connect();
   try {
-    const farm_id = await getFarmId(); // 🔒 Secure check
+    const { farm_id } = await getSessionInfo();
+    if (!farm_id) throw new Error('Unauthorized'); // Block Super Admin for now
+
     const body = await request.json();
     const { 
       plot_number, crop_type, variety, planting_date, 
@@ -52,7 +63,7 @@ export async function POST(request: Request) {
       RETURNING *
     `;
     const values = [
-      farm_id, // 🔒 Bind to farm
+      farm_id, 
       plot_number, crop_type, variety, planting_date, 
       expected_harvest_date, plot_size_acres, location, estimated_yield_kg, 
       status || 'Growing'
@@ -67,10 +78,11 @@ export async function POST(request: Request) {
   }
 }
 
+// PUT: Farm Owner + Super Admin (if needed, but usually kept strict)
 export async function PUT(request: Request) {
   const client = await pool.connect();
   try {
-    const farm_id = await getFarmId(); // 🔒 Secure check
+    const { farm_id, is_superadmin } = await getSessionInfo();
     const body = await request.json();
     const { 
       id, plot_number, crop_type, variety, planting_date, expected_harvest_date, 
@@ -78,27 +90,29 @@ export async function PUT(request: Request) {
       actual_yield_kg, harvest_notes 
     } = body;
 
-    const query = `
-      UPDATE crops
-      SET plot_number = $1,
-          crop_type = $2,
-          variety = $3,
-          planting_date = $4,
-          expected_harvest_date = $5,
-          plot_size_acres = $6,
-          location = $7,
-          estimated_yield_kg = $8,
-          actual_yield_kg = $9,
-          harvest_notes = $10,
-          status = $11
-      WHERE id = $12 AND farm_id = $13 -- 🔒 Scope update
-      RETURNING *
-    `;
-    const values = [
+    // ✅ Logic: Super Admin can update ANY crop by ID. Client restricted by farm_id.
+    let whereClause = "WHERE id = $12";
+    let values = [
       plot_number, crop_type, variety, planting_date, expected_harvest_date,
       plot_size_acres, location, estimated_yield_kg, actual_yield_kg, 
-      harvest_notes, status, id, farm_id
+      harvest_notes, status, id
     ];
+
+    if (!is_superadmin) {
+        if (!farm_id) throw new Error('Unauthorized');
+        whereClause += " AND farm_id = $13";
+        values.push(farm_id);
+    }
+
+    const query = `
+      UPDATE crops
+      SET plot_number = $1, crop_type = $2, variety = $3, planting_date = $4,
+          expected_harvest_date = $5, plot_size_acres = $6, location = $7,
+          estimated_yield_kg = $8, actual_yield_kg = $9, harvest_notes = $10, status = $11
+      ${whereClause}
+      RETURNING *
+    `;
+
     const result = await client.query(query, values);
     
     if (result.rows.length === 0) {
@@ -113,26 +127,28 @@ export async function PUT(request: Request) {
   }
 }
 
-// ✅ DELETE HANDLER
+// DELETE: Farm Owner + Super Admin
 export async function DELETE(request: Request) {
     const client = await pool.connect();
     try {
-        const farm_id = await getFarmId(); // 🔒 Secure check
+        const { farm_id, is_superadmin } = await getSessionInfo();
         const { id } = await request.json();
         
-        if (!id) {
-            return NextResponse.json({ error: 'ID is required' }, { status: 400 });
-        }
+        if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
         await client.query('BEGIN');
         
-        // Delete associated treatments first (Scoped to farm via crop ownership check implicitly, or explicit join)
-        // Ideally we check ownership first, but standard DELETE WHERE id AND farm_id is safe enough.
-        // However, since treatments rely on crop_id, we just need to ensure the CROP belongs to the farm.
-        
-        // 1. Verify Crop Ownership & Existence
-        const checkQuery = 'SELECT id FROM crops WHERE id = $1 AND farm_id = $2';
-        const check = await client.query(checkQuery, [id, farm_id]);
+        // 1. Check Existence & Ownership
+        let checkQuery = 'SELECT id FROM crops WHERE id = $1';
+        let checkParams = [id];
+
+        if (!is_superadmin) {
+            if (!farm_id) throw new Error('Unauthorized');
+            checkQuery += ' AND farm_id = $2';
+            checkParams.push(farm_id);
+        }
+
+        const check = await client.query(checkQuery, checkParams);
         
         if (check.rowCount === 0) {
             await client.query('ROLLBACK');

@@ -3,11 +3,22 @@
 import { useEffect, useRef } from 'react';
 import { db } from '@/lib/db';
 import { toast } from 'sonner';
+import { useSession } from 'next-auth/react';
 
 export default function OfflineSync() {
   const hasPulledData = useRef(false);
+  const { data: session } = useSession();
+  
+  // ✅ FIX: Define isSuperAdmin from the session
+  const isSuperAdmin = (session?.user as any)?.is_superadmin;
 
   useEffect(() => {
+    // 🛑 If the user is a Super Admin, do NOT run any sync logic.
+    if (isSuperAdmin) {
+        console.log("Super Admin detected, skipping offline sync.");
+        return;
+    }
+
     if (!hasPulledData.current && navigator.onLine) {
         pullDataFromServer();
         hasPulledData.current = true;
@@ -17,17 +28,19 @@ export default function OfflineSync() {
         pushDataToServer();
     }, 15000);
     
-    window.addEventListener('online', () => {
+    const onlineHandler = () => {
         console.log("Back online! Syncing...");
         pushDataToServer();
         pullDataFromServer();
-    });
+    };
+    
+    window.addEventListener('online', onlineHandler);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('online', pushDataToServer);
+      window.removeEventListener('online', onlineHandler);
     };
-  }, []);
+  }, [isSuperAdmin]); // Rerun this effect when the session loads
 
   // --- MAPPERS ---
   const mapEmployeeToLocal = (serverItem: any) => ({
@@ -88,8 +101,6 @@ export default function OfflineSync() {
             if (Array.isArray(tasks)) await db.tasks.bulkPut(tasks.map(mapTaskToLocal));
             if (Array.isArray(sales)) await db.sales.bulkPut(sales.map(s => ({...s, syncStatus: 'synced'})));
             if (Array.isArray(employees)) await db.employees.bulkPut(employees.map(mapEmployeeToLocal));
-            
-            // Sync Expenses
             if (Array.isArray(expenses)) await db.expenses.bulkPut(expenses.map(mapExpenseToLocal));
         });
         console.log("✅ Sync complete");
@@ -106,6 +117,12 @@ export default function OfflineSync() {
       // 1. EMPLOYEES
       const pendingEmps = await db.employees.where('syncStatus').notEqual('synced').toArray();
       for (const emp of pendingEmps) {
+          if (emp.syncStatus === 'deleted') {
+             await fetch('/api/employees', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: emp.id }) });
+             await db.employees.delete(emp.id!);
+             continue;
+          }
+
           const payload = {
               id: emp.id,
               full_name: emp.name,
@@ -114,9 +131,7 @@ export default function OfflineSync() {
               status: emp.isActive ? 'Active' : 'Inactive'
           };
           
-          // ✅ FIX: Use syncStatus to determine method
           const method = emp.syncStatus === 'updated' ? 'PUT' : 'POST'; 
-          
           const res = await fetch('/api/employees', {
               method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
           });
@@ -135,7 +150,12 @@ export default function OfflineSync() {
       // 2. TASKS
       const pendingTasks = await db.tasks.where('syncStatus').notEqual('synced').toArray();
       for (const task of pendingTasks) {
-        // Resolve Names to IDs
+        if (task.syncStatus === 'deleted') {
+             await fetch('/api/tasks', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id }) });
+             await db.tasks.delete(task.id!);
+             continue;
+        }
+
         const assigneeNames = task.assignedTo ? task.assignedTo.split(',') : [];
         const assigneeIds = [];
         
@@ -170,6 +190,12 @@ export default function OfflineSync() {
       // 3. INVENTORY
       const pendingInv = await db.inventory.where('syncStatus').notEqual('synced').toArray();
       for (const item of pendingInv) {
+          if (item.syncStatus === 'deleted') {
+             await fetch('/api/inventory', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: item.id }) });
+             await db.inventory.delete(item.id!);
+             continue;
+          }
+
           const payload = {
               ...item,
               item_name: item.name,
@@ -179,10 +205,6 @@ export default function OfflineSync() {
           };
           
           const method = item.syncStatus === 'updated' ? 'PUT' : 'POST';
-          const endpoint = method === 'PUT' ? `/api/inventory` : '/api/inventory'; // Ensure correct endpoint logic if needed, but standard POST usually handles both or standard REST uses ID
-
-          // Note: Standard REST puts update at /api/inventory (if body has ID) or /api/inventory/ID
-          // Adjust based on your API. Assuming body has ID is enough for your PUT route:
           const res = await fetch('/api/inventory', {
               method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
           });
@@ -201,6 +223,12 @@ export default function OfflineSync() {
       // 4. CROPS
       const pendingCrops = await db.crops.where('syncStatus').notEqual('synced').toArray();
       for (const crop of pendingCrops) {
+        if (crop.syncStatus === 'deleted') {
+             await fetch('/api/crops', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: crop.id }) });
+             await db.crops.delete(crop.id!);
+             continue;
+        }
+
         const method = crop.syncStatus === 'updated' ? 'PUT' : 'POST';
         const res = await fetch('/api/crops', {
           method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(crop)
@@ -218,8 +246,14 @@ export default function OfflineSync() {
       }
 
       // 5. SALES
-      const pendingSales = await db.sales.where('syncStatus').equals('pending').toArray();
+      const pendingSales = await db.sales.where('syncStatus').notEqual('synced').toArray();
       for (const sale of pendingSales) {
+        if (sale.syncStatus === 'deleted') {
+             await fetch('/api/sales', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: sale.id }) });
+             await db.sales.delete(sale.id!);
+             continue;
+        }
+
         const payload = {
             buyer_name: sale.customer,
             contact_info: (sale as any).contact_info,
@@ -227,15 +261,22 @@ export default function OfflineSync() {
             items: (sale as any).itemsData || [], 
             deduct_inventory: false 
         };
+        
         const res = await fetch('/api/sales', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
         });
         if (res.ok) await db.sales.update(sale.id!, { syncStatus: 'synced' });
       }
 
-      // 6. EXPENSES (NEW)
+      // 6. EXPENSES
       const pendingExpenses = await db.expenses.where('syncStatus').notEqual('synced').toArray();
       for (const exp of pendingExpenses) {
+        if (exp.syncStatus === 'deleted') {
+             await fetch('/api/expenses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: exp.id }) });
+             await db.expenses.delete(exp.id!);
+             continue;
+        }
+
         const res = await fetch('/api/expenses', {
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' },
@@ -257,5 +298,6 @@ export default function OfflineSync() {
     }
   }
 
+  // This component renders nothing.
   return null;
 }

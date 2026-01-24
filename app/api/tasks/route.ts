@@ -10,29 +10,33 @@ const toTitleCase = (str: string) => {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 };
 
-async function getFarmId() {
+async function getSessionInfo() {
   const session = await getServerSession(authOptions);
-  if (!session || !(session.user as any).farm_id) {
-    throw new Error('Unauthorized');
-  }
-  return (session.user as any).farm_id;
+  if (!session) throw new Error('Unauthorized');
+  return {
+    farm_id: (session.user as any).farm_id,
+    is_superadmin: (session.user as any).is_superadmin
+  };
 }
 
 export async function GET() {
-  const client = await pool.connect();
+  // ✅ OPTIMIZATION: Use pool.query() directly. No manual client management needed.
   try {
-    const farm_id = await getFarmId(); // 🔒 Secure check
+    const { farm_id, is_superadmin } = await getSessionInfo();
+
+    const whereClause = is_superadmin ? "" : "WHERE t.farm_id = $1";
+    const params = is_superadmin ? [] : [farm_id];
 
     const query = `
       SELECT t.*, STRING_AGG(e.full_name, ', ') as assignee_names
       FROM tasks t
       LEFT JOIN task_assignments ta ON t.id = ta.task_id
       LEFT JOIN employees e ON ta.employee_id = e.id
-      WHERE t.farm_id = $1 -- 🔒 Scoped to farm
+      ${whereClause}
       GROUP BY t.id
       ORDER BY t.created_at DESC
     `;
-    const result = await client.query(query, [farm_id]);
+    const result = await pool.query(query, params);
     
     const rows = result.rows.map(row => ({
       ...row,
@@ -46,15 +50,15 @@ export async function GET() {
   } catch (error: any) {
     console.error('Fetch tasks error:', error);
     return NextResponse.json([], { status: error.message === 'Unauthorized' ? 401 : 500 });
-  } finally {
-    client.release();
   }
 }
 
 export async function POST(request: Request) {
   const client = await pool.connect();
   try {
-    const farm_id = await getFarmId(); // 🔒 Secure check
+    const { farm_id } = await getSessionInfo();
+    if (!farm_id) throw new Error('Unauthorized'); 
+
     const body = await request.json();
     const { title, description, assigned_to_ids, due_date, priority, category, status } = body;
 
@@ -70,7 +74,7 @@ export async function POST(request: Request) {
       RETURNING *
     `;
     const result = await client.query(insertQuery, [
-      farm_id, // 🔒 Bind to farm
+      farm_id, 
       title, 
       description, 
       due_date, 
@@ -83,7 +87,6 @@ export async function POST(request: Request) {
     if (assigned_to_ids && Array.isArray(assigned_to_ids) && assigned_to_ids.length > 0) {
       const uniqueEmpIds = [...new Set(assigned_to_ids)].filter(Boolean);
       for (const empId of uniqueEmpIds) {
-        // Need to insert farm_id into task_assignments as well
         await client.query(
             'INSERT INTO task_assignments (farm_id, task_id, employee_id) VALUES ($1, $2, $3)', 
             [farm_id, newTask.id, empId]
@@ -106,7 +109,7 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
  const client = await pool.connect();
   try {
-    const farm_id = await getFarmId(); // 🔒 Secure check
+    const { farm_id, is_superadmin } = await getSessionInfo();
     const body = await request.json();
     const { id, status, title, description, assigned_to_ids, due_date, priority, category } = body;
 
@@ -114,6 +117,7 @@ export async function PUT(request: Request) {
 
     await client.query('BEGIN');
 
+    const whereClause = is_superadmin ? "WHERE id = $7" : "WHERE id = $7 AND farm_id = $8";
     const updateQuery = `
       UPDATE tasks 
       SET 
@@ -123,19 +127,16 @@ export async function PUT(request: Request) {
         priority = $4, 
         category = $5, 
         status = $6 
-      WHERE id = $7 AND farm_id = $8 -- 🔒 Scoped Update
+      ${whereClause}
       RETURNING *
     `;
-    const res = await client.query(updateQuery, [
-        title, 
-        description, 
-        due_date, 
-        priority?.toLowerCase(), 
-        category || 'General', 
-        status?.toLowerCase(), 
-        id,
-        farm_id
-    ]);
+    
+    const params = [
+        title, description, due_date, priority?.toLowerCase(), category || 'General', status?.toLowerCase(), id
+    ];
+    if (!is_superadmin) params.push(farm_id);
+
+    const res = await client.query(updateQuery, params);
     
     if (res.rows.length === 0) {
         await client.query('ROLLBACK');
@@ -149,10 +150,12 @@ export async function PUT(request: Request) {
         await client.query('DELETE FROM task_assignments WHERE task_id = $1', [id]);
         
         const uniqueEmpIds = [...new Set(assigned_to_ids)].filter(Boolean);
+        const targetFarmId = updatedTask.farm_id; 
+
         for (const empId of uniqueEmpIds) {
           await client.query(
               'INSERT INTO task_assignments (farm_id, task_id, employee_id) VALUES ($1, $2, $3)', 
-              [farm_id, id, empId]
+              [targetFarmId, id, empId]
           );
         }
     }
@@ -172,13 +175,21 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   const client = await pool.connect();
   try {
-    const farm_id = await getFarmId(); // 🔒 Secure check
+    const { farm_id, is_superadmin } = await getSessionInfo();
     const { id } = await request.json();
     
     await client.query('BEGIN');
     
-    // Check ownership first
-    const check = await client.query('SELECT id FROM tasks WHERE id = $1 AND farm_id = $2', [id, farm_id]);
+    let checkQuery = 'SELECT id FROM tasks WHERE id = $1';
+    let checkParams = [id];
+
+    if (!is_superadmin) {
+        if (!farm_id) throw new Error('Unauthorized');
+        checkQuery += ' AND farm_id = $2';
+        checkParams.push(farm_id);
+    }
+
+    const check = await client.query(checkQuery, checkParams);
     if (check.rowCount === 0) {
         await client.query('ROLLBACK');
         return NextResponse.json({ error: 'Task not found or access denied' }, { status: 404 });

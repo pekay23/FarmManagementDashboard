@@ -4,16 +4,19 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { 
   Users, UserPlus, Trash2, Pencil, Shield, 
-  Lock, Mail, X, Loader2, CheckCircle 
+  Lock, Mail, X, Loader2, Warehouse 
 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 
 export default function UserManagement() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
+  
+  const { data: session } = useSession();
+  const isSuperAdmin = (session?.user as any)?.is_superadmin;
 
-  // Fetch users on load
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -35,7 +38,7 @@ export default function UserManagement() {
     const formData = {
         email: e.target.email.value,
         password: e.target.password.value,
-        role: e.target.role.value
+        farm_name: e.target.farm_name?.value, // ✅ Capture Farm Name for new users
     };
 
     try {
@@ -57,10 +60,10 @@ export default function UserManagement() {
         }
 
         if (res.ok) {
-            toast.success(editingUser ? "User updated" : "User created");
+            toast.success(editingUser ? "Account updated" : "New Farm Owner & Farm created!");
             setIsModalOpen(false);
             setEditingUser(null);
-            fetchUsers(); // Refresh list
+            fetchUsers(); 
         } else {
             const err = await res.json();
             toast.error(err.error || "Operation failed");
@@ -71,15 +74,13 @@ export default function UserManagement() {
   }
 
   async function handleDelete(id: number) {
-      if (!confirm("Are you sure you want to delete this user? This action cannot be undone.")) return;
-      
+      if (!confirm("Delete this user? This cannot be undone.")) return;
       try {
           const res = await fetch('/api/users', {
               method: 'DELETE',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ id })
           });
-          
           if (res.ok) {
               toast.success("User deleted");
               fetchUsers();
@@ -98,16 +99,21 @@ export default function UserManagement() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Shield className="w-6 h-6 text-primary-600"/> Admin Panel
+            <Shield className="w-6 h-6 text-primary-600"/> 
+            {isSuperAdmin ? "Platform User Management" : "Account Management"}
           </h1>
-          <p className="text-gray-500">Manage access and user accounts</p>
+          <p className="text-gray-500">Manage farm owner accounts</p>
         </div>
-        <button 
-            onClick={() => { setEditingUser(null); setIsModalOpen(true); }} 
-            className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg flex items-center gap-2 font-bold shadow-md transition-colors"
-        >
-            <UserPlus className="w-5 h-5" /> Add New User
-        </button>
+        
+        {/* Only Super Admin can add new Farm Owners directly here */}
+        {isSuperAdmin && (
+            <button 
+                onClick={() => { setEditingUser(null); setIsModalOpen(true); }} 
+                className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg flex items-center gap-2 font-bold shadow-md transition-colors"
+            >
+                <UserPlus className="w-5 h-5" /> Add Farm Owner
+            </button>
+        )}
       </div>
 
       {/* Users Table */}
@@ -119,8 +125,9 @@ export default function UserManagement() {
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 tracking-wider">
-                            <th className="p-4 font-semibold">User</th>
-                            <th className="p-4 font-semibold">Role</th>
+                            <th className="p-4 font-semibold">User / Email</th>
+                            {isSuperAdmin && <th className="p-4 font-semibold">Farm Name</th>}
+                            <th className="p-4 font-semibold">Type</th>
                             <th className="p-4 font-semibold">Joined</th>
                             <th className="p-4 font-semibold text-right">Actions</th>
                         </tr>
@@ -136,11 +143,18 @@ export default function UserManagement() {
                                         <div className="font-medium text-gray-900">{user.email}</div>
                                     </div>
                                 </td>
+                                
+                                {isSuperAdmin && (
+                                    <td className="p-4 text-sm text-gray-600 font-medium">
+                                        {user.farm_name || <span className="text-gray-400 italic">No Farm</span>}
+                                    </td>
+                                )}
+
                                 <td className="p-4">
                                     <span className={`px-2 py-1 rounded-md text-xs font-bold ${
-                                        user.role === 'Admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
+                                        (user.role === 'Admin' || user.is_superadmin) ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'
                                     }`}>
-                                        {user.role}
+                                        {(user.role === 'Admin' || user.is_superadmin) ? 'Platform Admin' : 'Farm Owner'}
                                     </span>
                                 </td>
                                 <td className="p-4 text-gray-500 text-sm">
@@ -150,14 +164,12 @@ export default function UserManagement() {
                                     <button 
                                         onClick={() => { setEditingUser(user); setIsModalOpen(true); }} 
                                         className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                                        title="Edit User"
                                     >
                                         <Pencil className="w-4 h-4" />
                                     </button>
                                     <button 
                                         onClick={() => handleDelete(user.id)} 
                                         className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                        title="Delete User"
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </button>
@@ -166,9 +178,6 @@ export default function UserManagement() {
                         ))}
                     </tbody>
                 </table>
-                {users.length === 0 && (
-                    <div className="p-8 text-center text-gray-400 italic">No users found.</div>
-                )}
             </div>
         )}
       </div>
@@ -178,7 +187,7 @@ export default function UserManagement() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
             <div className="bg-white rounded-xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-gray-900">{editingUser ? 'Edit User' : 'Create New User'}</h2>
+                    <h2 className="text-xl font-bold text-gray-900">{editingUser ? 'Edit Account' : 'Create Farm Owner'}</h2>
                     <button onClick={() => setIsModalOpen(false)}><X className="text-gray-400 hover:text-gray-600" /></button>
                 </div>
                 
@@ -192,12 +201,29 @@ export default function UserManagement() {
                                 type="email" 
                                 required 
                                 defaultValue={editingUser?.email}
-                                disabled={!!editingUser} // Prevent changing email on edit
+                                disabled={!!editingUser} 
                                 className="w-full pl-9 pr-4 py-2.5 border rounded-lg outline-none focus:border-primary-500 disabled:bg-gray-100 disabled:text-gray-500" 
-                                placeholder="user@farm.com"
+                                placeholder="client@farm.com"
                             />
                         </div>
                     </div>
+
+                    {/* ✅ New Field: Farm Name (Only for new users) */}
+                    {!editingUser && (
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase ml-1">Farm Name</label>
+                            <div className="relative mt-1">
+                                <Warehouse className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+                                <input 
+                                    name="farm_name" 
+                                    type="text" 
+                                    required 
+                                    className="w-full pl-9 pr-4 py-2.5 border rounded-lg outline-none focus:border-primary-500" 
+                                    placeholder="e.g. Sunrise Organics"
+                                />
+                            </div>
+                        </div>
+                    )}
 
                     <div>
                         <label className="text-xs font-bold text-gray-500 uppercase ml-1">
@@ -216,23 +242,13 @@ export default function UserManagement() {
                         {editingUser && <p className="text-xs text-gray-400 mt-1 ml-1">Leave blank to keep current password.</p>}
                     </div>
 
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase ml-1">Role</label>
-                        <select name="role" defaultValue={editingUser?.role || 'Viewer'} className="w-full mt-1 p-2.5 border rounded-lg bg-white outline-none focus:border-primary-500">
-                            <option value="Admin">Admin (Full Access)</option>
-                            <option value="Manager">Manager (Edit Access)</option>
-                            <option value="Viewer">Viewer (Read Only)</option>
-                        </select>
-                    </div>
-
                     <button className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-lg font-bold shadow-md mt-2">
-                        {editingUser ? 'Update User' : 'Create User'}
+                        {editingUser ? 'Update Account' : 'Create Account'}
                     </button>
                 </form>
             </div>
         </div>
       )}
-
     </div>
   );
 }

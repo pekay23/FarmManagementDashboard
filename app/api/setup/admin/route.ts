@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { hash } from 'bcryptjs';
-import pool from '@/lib/pg'; // ✅ Use shared pool
+import pool from '@/lib/pg';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,10 +8,15 @@ export async function GET() {
   const client = await pool.connect();
   
   try {
+    // 🔒 SAFETY CHECK: Don't run if a Super Admin already exists
+    const check = await client.query("SELECT id FROM users WHERE is_superadmin = TRUE LIMIT 1");
+    if (check.rows.length > 0) {
+        return NextResponse.json({ error: "System already initialized. Use the script to create new admins." }, { status: 403 });
+    }
+
     await client.query('BEGIN');
 
-    // 1. Create Default Farm if none exists
-    // (This ensures the admin has a "home")
+    // 1. Create Default Farm
     let farm_id;
     const farmCheck = await client.query("SELECT id FROM farms WHERE name = 'Default Farm' LIMIT 1");
     
@@ -25,20 +30,20 @@ export async function GET() {
     // 2. Encrypt Password
     const hashedPassword = await hash('123', 10);
 
-    // 3. Insert/Update Admin User linked to the Farm
-    // Note: We use ON CONFLICT to reset password/farm if user exists
+    // 3. Create Super Admin
+    // Using is_superadmin = TRUE instead of role = 'Admin'
     await client.query(`
-      INSERT INTO users (email, password, role, farm_id)
-      VALUES ('admin@farm.com', $1, 'Admin', $2)
+      INSERT INTO users (email, password, is_superadmin, farm_id)
+      VALUES ('admin@farm.com', $1, TRUE, $2)
       ON CONFLICT (email) 
-      DO UPDATE SET password = $1, role = 'Admin', farm_id = $2
+      DO UPDATE SET password = $1, is_superadmin = TRUE, farm_id = $2
     `, [hashedPassword, farm_id]);
 
     await client.query('COMMIT');
 
     return NextResponse.json({ 
       success: true, 
-      message: "Admin reset! Login: admin@farm.com / 123",
+      message: "System initialized! Login: admin@farm.com / 123",
       farm_id: farm_id
     });
 

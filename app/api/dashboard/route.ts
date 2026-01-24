@@ -5,21 +5,34 @@ import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-async function getFarmId() {
-  const session = await getServerSession(authOptions);
-  if (!session || !(session.user as any).farm_id) {
-    throw new Error('Unauthorized');
-  }
-  return (session.user as any).farm_id;
-}
-
-export async function GET() {
-  const client = await pool.connect();
-  
+export async function GET(request: Request) {
   try {
-    const farm_id = await getFarmId(); // 🔒 Secure check
+    const { searchParams } = new URL(request.url);
+    const selectedFarmId = searchParams.get('farm_id'); 
 
-    // 1. Run all independent queries in PARALLEL for speed
+    const session = await getServerSession(authOptions);
+    const user = session?.user as any;
+    
+    if (!session) throw new Error('Unauthorized');
+
+    const isSuperAdmin = user.is_superadmin;
+    const userFarmId = user.farm_id;
+
+    let targetFarmId = userFarmId;
+    if (isSuperAdmin && selectedFarmId && selectedFarmId !== 'all') {
+        targetFarmId = selectedFarmId;
+    }
+
+    const isAggregateView = isSuperAdmin && (!selectedFarmId || selectedFarmId === 'all');
+    const where = isAggregateView ? "1=1" : "farm_id = $1";
+    const params = isAggregateView ? [] : [targetFarmId];
+    
+    const intervalParamIndex = isAggregateView ? '$1' : '$2';
+    const interval = '7 days';
+    const intervalParams = isAggregateView ? [interval] : [targetFarmId, interval];
+
+    const allFarmsRes = isSuperAdmin ? await pool.query('SELECT id, name FROM farms ORDER BY name') : { rows: [] };
+
     const [
       cropsCountRes,
       animalsCountRes,
@@ -32,67 +45,36 @@ export async function GET() {
       recentSalesRes,
       recentTasksRes
     ] = await Promise.all([
-      // KPIs - Scoped to farm_id
-      client.query('SELECT COUNT(*) FROM crops WHERE farm_id = $1', [farm_id]),
-      client.query('SELECT COUNT(*) FROM livestock WHERE farm_id = $1', [farm_id]),
-      client.query('SELECT SUM(total_amount) FROM sales WHERE farm_id = $1', [farm_id]),
-      client.query("SELECT COUNT(*) FROM tasks WHERE status = 'Pending' AND farm_id = $1", [farm_id]),
-      
-      // Alerts: Low Stock - Scoped
-      client.query('SELECT item_name as name, quantity, unit FROM inventory WHERE quantity <= min_threshold AND farm_id = $1 LIMIT 3', [farm_id]),
-      
-      // Alerts: Overdue Tasks - Scoped
-      client.query("SELECT title, due_date FROM tasks WHERE status != 'Completed' AND due_date < CURRENT_DATE AND farm_id = $1 LIMIT 3", [farm_id]),
-      
-      // Upcoming Harvests (Next 14 days) - Scoped
-      client.query(`
+      pool.query(`SELECT COUNT(*) FROM crops WHERE ${where}`, params),
+      pool.query(`SELECT COUNT(*) FROM livestock WHERE ${where}`, params),
+      pool.query(`SELECT SUM(total_amount) FROM sales WHERE ${where}`, params),
+      pool.query(`SELECT COUNT(*) FROM tasks WHERE status = 'Pending' AND ${where}`, params),
+      pool.query(`SELECT item_name as name, quantity, unit FROM inventory WHERE quantity <= min_threshold AND ${where} LIMIT 3`, params),
+      pool.query(`SELECT title, due_date FROM tasks WHERE status != 'Completed' AND due_date < CURRENT_DATE AND ${where} LIMIT 3`, params),
+      pool.query(`
         SELECT crop_type, plot_number, expected_harvest_date 
         FROM crops 
-        WHERE status = 'Growing' 
-        AND expected_harvest_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '14 days'
-        AND farm_id = $1
-        ORDER BY expected_harvest_date ASC
-        LIMIT 5
-      `, [farm_id]),
-      
-      // Sales Trend (Last 7 Days) - Scoped
-      client.query(`
+        WHERE status = 'Growing' AND expected_harvest_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '14 days' AND ${where}
+        ORDER BY expected_harvest_date ASC LIMIT 5
+      `, params),
+      pool.query(`
         SELECT TO_CHAR(sale_date, 'Mon DD') as name, SUM(total_amount) as value 
         FROM sales 
-        WHERE sale_date >= NOW() - INTERVAL '7 days' AND farm_id = $1
-        GROUP BY TO_CHAR(sale_date, 'Mon DD'), sale_date 
-        ORDER BY sale_date
-      `, [farm_id]),
-
-      // Recent Activity: Sales - Scoped
-      client.query("SELECT 'sale' as type, buyer_name as customer, sale_date as date, total_amount as amount FROM sales WHERE farm_id = $1 ORDER BY sale_date DESC LIMIT 5", [farm_id]),
+        WHERE sale_date >= NOW() - ${intervalParamIndex}::INTERVAL AND ${where}
+        GROUP BY TO_CHAR(sale_date, 'Mon DD'), sale_date ORDER BY sale_date
+      `, intervalParams),
+      pool.query(`SELECT 'sale' as type, buyer_name as customer, sale_date as date, total_amount as amount FROM sales WHERE ${where} ORDER BY sale_date DESC LIMIT 5`, params),
       
-      // Recent Activity: Tasks - Scoped
-      client.query("SELECT 'task' as type, title, updated_at as date, status FROM tasks WHERE status = 'Completed' AND farm_id = $1 ORDER BY updated_at DESC LIMIT 5", [farm_id])
+      // ✅ FIX: Changed updated_at to created_at
+      pool.query(`SELECT 'task' as type, title, created_at as date, status FROM tasks WHERE status = 'Completed' AND ${where} ORDER BY created_at DESC LIMIT 5`, params)
     ]);
 
-    // 2. Format the Activity Feed (Combine Sales & Tasks)
-    const recentSales = recentSalesRes.rows.map(s => ({
-      type: 'sale',
-      title: `Sale: ${s.customer || 'Unknown'}`,
-      date: s.date,
-      detail: `GH₵ ${s.amount}`
-    }));
+    const recentSales = recentSalesRes.rows.map(s => ({ type: 'sale', title: `Sale: ${s.customer || 'Unknown'}`, date: s.date, detail: `GH₵ ${s.amount}` }));
+    const recentTasks = recentTasksRes.rows.map(t => ({ type: 'task', title: `Task: ${t.title}`, date: t.date, detail: t.status }));
+    const activityFeed = [...recentSales, ...recentTasks].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
 
-    const recentTasks = recentTasksRes.rows.map(t => ({
-      type: 'task',
-      title: `Task: ${t.title}`,
-      date: t.date, // mapped from updated_at
-      detail: t.status
-    }));
-
-    // Sort combined activity by date
-    const activityFeed = [...recentSales, ...recentTasks]
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 5);
-
-    // 3. Return JSON
     return NextResponse.json({
+      allFarms: allFarmsRes.rows,
       kpi: {
         crops: Number(cropsCountRes.rows[0].count),
         animals: Number(animalsCountRes.rows[0].count),
@@ -112,8 +94,6 @@ export async function GET() {
 
   } catch (error: any) {
     console.error("Dashboard API Error:", error);
-    return NextResponse.json({ error: 'Failed to fetch dashboard data' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
-  } finally {
-    client.release();
+    return NextResponse.json({ error: 'Failed to fetch dashboard data' }, { status: 500 });
   }
 }

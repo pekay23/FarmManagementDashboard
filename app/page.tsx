@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { 
   Sprout, Users, DollarSign, Calendar, TrendingUp, TrendingDown, AlertTriangle, 
-  CheckCircle, Activity, Package, Clock, Wallet
+  CheckCircle, Activity, Package, Clock, Wallet, Building
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import Link from 'next/link';
@@ -16,123 +18,109 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { data: session } = useSession();
+  
+  const selectedFarm = searchParams.get('farm_id') || 'all';
+  const isSuperAdmin = (session?.user as any)?.is_superadmin;
+
   useEffect(() => {
-    async function loadOfflineData() {
-      setLoading(true);
-      try {
-        // Helper to exclude deleted items
-        const notDeleted = (item: any) => item.syncStatus !== 'deleted';
-
-        const [
-          livestock,
-          crops,
-          sales,
-          inventory,
-          tasks,
-          expenses
-        ] = await Promise.all([
-          db.livestock.filter(notDeleted).toArray(),
-          db.crops.filter(notDeleted).toArray(),
-          db.sales.filter(notDeleted).toArray(),
-          db.inventory.filter(notDeleted).toArray(),
-          db.tasks.filter(notDeleted).toArray(),
-          db.expenses.filter(notDeleted).toArray()
-        ]);
-
-        // 2. Calculate Financials
-        const totalRevenue = sales.reduce((sum, sale) => sum + (Number(sale.amount) || 0), 0);
-        const totalExpenses = expenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
-        const netProfit = totalRevenue - totalExpenses;
-
-        const pendingTasks = tasks.filter(t => t.status === 'Pending').length;
-        
-        const lowStock = inventory.filter(i => i.quantity <= i.lowStockThreshold);
-        
-        const overdue = tasks.filter(t => 
-            t.status === 'Pending' && 
-            t.dueDate && 
-            new Date(t.dueDate).getTime() < new Date().getTime()
-        );
-        
-        // --- UPCOMING HARVESTS (Next 30 Days) ---
-        const today = new Date();
-        const thirtyDaysLater = new Date();
-        thirtyDaysLater.setDate(today.getDate() + 30);
-
-        const upcomingHarvests = crops
-          .filter(c => {
-              const status = c.status?.toLowerCase() || '';
-              const harvestDate = c.expected_harvest_date ? new Date(c.expected_harvest_date) : null;
-              
-              return (status === 'growing' || status === 'planted') && 
-                     harvestDate && 
-                     harvestDate >= today && 
-                     harvestDate <= thirtyDaysLater;
-          })
-          .sort((a, b) => new Date(a.expected_harvest_date || '9999-12-31').getTime() - new Date(b.expected_harvest_date || '9999-12-31').getTime())
-          .slice(0, 5); 
-
-        // --- SALES TREND (Aggregated by Day) ---
-        const salesByDay: Record<string, number> = {};
-        sales.forEach(sale => {
-            const dateStr = new Date(sale.date).toISOString().split('T')[0]; // YYYY-MM-DD
-            salesByDay[dateStr] = (salesByDay[dateStr] || 0) + (Number(sale.amount) || 0);
-        });
-
-        // Convert to array, sort by date, take last 7
-        const salesTrend = Object.keys(salesByDay)
-            .sort()
-            .slice(-7)
-            .map(dateKey => ({
-                name: new Date(dateKey).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
-                value: salesByDay[dateKey]
-            }));
-
-        // --- ACTIVITY FEED ---
-        const activity = [
-            ...sales.map(s => ({ 
-                type: 'sale', 
-                title: 'New Sale Recorded', 
-                date: s.date || new Date().toISOString(), 
-                detail: `+GH₵${s.amount}` 
-            })),
-            ...expenses.map(e => ({ 
-                type: 'expense', 
-                title: 'Expense: ' + e.title, 
-                date: e.date || new Date().toISOString(), 
-                detail: `-GH₵${e.amount}` 
-            })),
-            ...tasks.filter(t => t.status === 'Completed').map(t => ({ 
-                type: 'task', 
-                title: 'Task Completed', 
-                date: t.updatedAt || new Date().toISOString(), 
-                detail: t.title 
-            }))
-        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
-
-        setData({
-          kpi: {
-            crops: crops.length,
-            animals: livestock.length,
-            sales: totalRevenue,
-            expenses: totalExpenses,
-            profit: netProfit,
-            tasks: pendingTasks
-          },
-          alerts: { lowStock, overdue, harvests: upcomingHarvests },
-          charts: { salesTrend },
-          activity
-        });
-
-      } catch (e: any) {
-        console.error("Failed to load dashboard data", e);
-        setError(e.message || "Error loading data");
-      } finally {
-        setLoading(false);
-      }
+    if (isSuperAdmin === undefined) return; // Wait for session
+    
+    if (isSuperAdmin) {
+      loadApiData();
+    } else {
+      loadOfflineData();
     }
-    loadOfflineData();
-  }, []);
+  }, [selectedFarm, isSuperAdmin]);
+
+  async function loadApiData() {
+    setLoading(true);
+    const url = `/api/dashboard?farm_id=${selectedFarm}`;
+    
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error("Failed to fetch dashboard data.");
+      const dashboardData = await res.json();
+      setData(dashboardData);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadOfflineData() {
+    setLoading(true);
+    try {
+      const notDeleted = (item: any) => item.syncStatus !== 'deleted';
+      const [livestock, crops, sales, inventory, tasks, expenses] = await Promise.all([
+        db.livestock.filter(notDeleted).toArray(),
+        db.crops.filter(notDeleted).toArray(),
+        db.sales.filter(notDeleted).toArray(),
+        db.inventory.filter(notDeleted).toArray(),
+        db.tasks.filter(notDeleted).toArray(),
+        db.expenses.filter(notDeleted).toArray()
+      ]);
+      const totalRevenue = sales.reduce((sum, sale) => sum + (Number(sale.amount) || 0), 0);
+      const totalExpenses = expenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+      const netProfit = totalRevenue - totalExpenses;
+      const pendingTasks = tasks.filter(t => t.status === 'Pending').length;
+      
+      const lowStock = inventory.filter(i => i.quantity <= i.lowStockThreshold);
+      
+      const overdue = tasks.filter(t => t.status === 'Pending' && t.dueDate && new Date(t.dueDate).getTime() < new Date().getTime());
+      
+      const today = new Date();
+      const thirtyDaysLater = new Date();
+      thirtyDaysLater.setDate(today.getDate() + 30);
+      const upcomingHarvests = crops
+        .filter(c => {
+          const status = c.status?.toLowerCase() || '';
+          const harvestDate = c.expected_harvest_date ? new Date(c.expected_harvest_date) : null;
+          return (status === 'growing' || status === 'planted') && harvestDate && harvestDate >= today && harvestDate <= thirtyDaysLater;
+        })
+        .sort((a, b) => new Date(a.expected_harvest_date || '9999-12-31').getTime() - new Date(b.expected_harvest_date || '9999-12-31').getTime())
+        .slice(0, 5);
+      
+      const salesByDay: Record<string, number> = {};
+      sales.forEach(sale => {
+          const dateStr = new Date(sale.date).toISOString().split('T')[0];
+          salesByDay[dateStr] = (salesByDay[dateStr] || 0) + (Number(sale.amount) || 0);
+      });
+      const salesTrend = Object.keys(salesByDay).sort().slice(-7).map(dateKey => ({
+          name: new Date(dateKey).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
+          value: salesByDay[dateKey]
+      }));
+
+      const activity = [...sales.map(s => ({ type: 'sale', title: 'New Sale Recorded', date: s.date || new Date().toISOString(), detail: `+GH₵${s.amount}` })), ...expenses.map(e => ({ type: 'expense', title: 'Expense: ' + e.title, date: e.date || new Date().toISOString(), detail: `-GH₵${e.amount}` })), ...tasks.filter(t => t.status === 'Completed').map(t => ({ type: 'task', title: 'Task Completed', date: t.updatedAt || new Date().toISOString(), detail: t.title }))].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+
+      setData({
+        kpi: {
+          crops: crops.length,
+          animals: livestock.length,
+          sales: totalRevenue,
+          expenses: totalExpenses,
+          profit: netProfit,
+          tasks: pendingTasks
+        },
+        alerts: { lowStock, overdue, harvests: upcomingHarvests },
+        charts: { salesTrend },
+        activity
+      });
+    } catch (e: any) {
+      console.error("Failed to load dashboard data", e);
+      setError(e.message || "Error loading data");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const handleFarmChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const newFarmId = e.target.value;
+      router.push(`/?farm_id=${newFarmId}`);
+  };
 
   if (loading) {
     return (
@@ -156,23 +144,53 @@ export default function Dashboard() {
       )
   }
 
-  const hasAlerts = (data?.alerts?.lowStock?.length > 0) || (data?.alerts?.overdue?.length > 0) || (data?.alerts?.harvests?.length > 0);
+  // Handle case where data might still be null after loading
+  if (!data) {
+      return (
+          <div className="flex flex-col items-center justify-center min-h-screen text-gray-400">
+              <Package className="w-12 h-12 animate-pulse mb-4 opacity-20" />
+              <p>No dashboard data available.</p>
+          </div>
+      );
+  }
+
+  const hasAlerts = (data.alerts?.lowStock?.length > 0) || (data.alerts?.overdue?.length > 0) || (data.alerts?.harvests?.length > 0);
 
   return (
     <div className="p-4 md:p-8 max-w-[1600px] mx-auto min-h-screen pb-20">
       
-      {/* 1. Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Farm Command Center</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+              {isSuperAdmin ? 'Platform Overview' : 'Farm Command Center'}
+          </h1>
           <p className="text-gray-500">Overview for {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         </div>
-        <div className="hidden md:block bg-white px-4 py-2 rounded-lg border border-gray-100 shadow-sm text-sm font-medium text-gray-600">
-           Hughes Farms • Offline Ready ⚡
-        </div>
+        
+        {isSuperAdmin && data.allFarms && (
+            <div className="flex items-center gap-2 bg-white p-2 rounded-lg border shadow-sm">
+                <Building className="w-5 h-5 text-gray-400" />
+                <select 
+                    onChange={handleFarmChange}
+                    value={selectedFarm}
+                    className="bg-transparent text-sm font-medium focus:outline-none"
+                >
+                    <option value="all">All Farms (Aggregate)</option>
+                    {data.allFarms.map((farm: any) => (
+                        <option key={farm.id} value={farm.id}>
+                            {farm.name}
+                        </option>
+                    ))}
+                </select>
+            </div>
+        )}
+        {!isSuperAdmin && (
+          <div className="hidden md:block bg-white px-4 py-2 rounded-lg border border-gray-100 shadow-sm text-sm font-medium text-gray-600">
+             Hughes Farms • Offline Ready ⚡
+          </div>
+        )}
       </div>
 
-      {/* 2. Smart Alerts Banner */}
       {hasAlerts && (
         <div className="mb-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {data.alerts.lowStock.length > 0 && (
@@ -220,23 +238,16 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 3. KPI Cards (Expanded to include Financials) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
-        {/* Financial Row */}
-        <KpiCard title="Net Profit" value={`GH₵ ${(data?.kpi.profit || 0).toLocaleString()}`} icon={Wallet} color={data?.kpi.profit >= 0 ? "green" : "red"} />
-        <KpiCard title="Total Revenue" value={`GH₵ ${(data?.kpi.sales || 0).toLocaleString()}`} icon={DollarSign} color="purple" />
-        <KpiCard title="Total Expenses" value={`GH₵ ${(data?.kpi.expenses || 0).toLocaleString()}`} icon={TrendingDown} color="orange" />
-        
-        {/* Operational Row */}
-        <KpiCard title="Active Crops" value={data?.kpi.crops || 0} icon={Sprout} color="teal" />
-        <KpiCard title="Livestock" value={data?.kpi.animals || 0} icon={Users} color="blue" />
-        <KpiCard title="Pending Tasks" value={data?.kpi.tasks || 0} icon={Calendar} color="yellow" />
+        <KpiCard title="Net Profit" value={`GH₵ ${(data.kpi.profit || 0).toLocaleString()}`} icon={Wallet} color={data.kpi.profit >= 0 ? "green" : "red"} />
+        <KpiCard title="Total Revenue" value={`GH₵ ${(data.kpi.sales || 0).toLocaleString()}`} icon={DollarSign} color="purple" />
+        <KpiCard title="Total Expenses" value={`GH₵ ${(data.kpi.expenses || 0).toLocaleString()}`} icon={TrendingDown} color="orange" />
+        <KpiCard title="Active Crops" value={data.kpi.crops || 0} icon={Sprout} color="teal" />
+        <KpiCard title="Livestock" value={data.kpi.animals || 0} icon={Users} color="blue" />
+        <KpiCard title="Pending Tasks" value={data.kpi.tasks || 0} icon={Calendar} color="yellow" />
       </div>
 
-      {/* 4. Main Grid: Charts & Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-        
-        {/* Left: Sales Trend */}
         <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-bold text-gray-800">Revenue Trend (Last 7 Days)</h2>
@@ -244,7 +255,7 @@ export default function Dashboard() {
           </div>
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data?.charts.salesTrend.length ? data.charts.salesTrend : [{name: 'No Data', value: 0}]}>
+                <AreaChart data={data.charts.salesTrend.length ? data.charts.salesTrend : [{name: 'No Data', value: 0}]}>
                     <defs>
                         <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.8}/>
@@ -260,18 +271,15 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
         </div>
-
-        {/* Right: Weather & Activity Feed */}
         <div className="space-y-6">
             <WeatherWidget />
-
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full max-h-[400px] overflow-y-auto">
                 <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2 sticky top-0 bg-white z-10 pb-2">
                     <Activity className="w-5 h-5 text-primary-600" /> Recent Activity
                 </h2>
                 <div className="space-y-4">
-                    {data?.activity.length === 0 && <p className="text-sm text-gray-400">No recent activity found.</p>}
-                    {data?.activity.map((item: any, i: number) => (
+                    {data.activity.length === 0 && <p className="text-sm text-gray-400">No recent activity found.</p>}
+                    {data.activity.map((item: any, i: number) => (
                         <div key={i} className="flex items-start gap-3 pb-3 border-b border-gray-50 last:border-0 last:pb-0">
                             <div className={`p-2 rounded-full ${
                                 item.type === 'sale' ? 'bg-primary-50 text-primary-600' : 
@@ -303,15 +311,12 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 5. Bottom Grid: Harvests & Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          
-          {/* Upcoming Harvests */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                   <Sprout className="w-5 h-5 text-primary-600" /> Active Crops
               </h2>
-              {data?.alerts.harvests.length === 0 ? (
+              {data.alerts.harvests.length === 0 ? (
                   <div className="bg-primary-50 p-4 rounded-lg text-center">
                       <p className="text-primary-800 font-medium text-sm">No active crops found.</p>
                       <Link href="/crops" className="text-primary-600 text-xs hover:underline mt-1 block">Add your first crop +</Link>
@@ -335,7 +340,6 @@ export default function Dashboard() {
               )}
           </div>
 
-          {/* Quick Actions Grid */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <h2 className="text-lg font-bold text-gray-800 mb-4">Quick Actions</h2>
             <div className="grid grid-cols-2 gap-4">
@@ -350,8 +354,6 @@ export default function Dashboard() {
   );
 }
 
-// --- Sub-Components ---
-
 function KpiCard({ title, value, icon: Icon, color }: any) {
   const colors: any = {
     teal: "bg-primary-100 text-primary-600",
@@ -362,7 +364,6 @@ function KpiCard({ title, value, icon: Icon, color }: any) {
     orange: "bg-orange-100 text-orange-600",
     red: "bg-red-100 text-red-600"
   };
-  
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex justify-between items-start hover:-translate-y-1 transition-transform cursor-default">
       <div>
