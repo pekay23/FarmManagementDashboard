@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { 
@@ -13,7 +13,8 @@ import { db } from '@/lib/db';
 import { Skeleton } from '@/components/ui/Skeleton';
 import WeatherWidget from '@/components/WeatherWidget';
 
-export default function Dashboard() {
+// 1. Rename the main logic component to DashboardContent
+function DashboardContent() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +27,7 @@ export default function Dashboard() {
   const isSuperAdmin = (session?.user as any)?.is_superadmin;
 
   useEffect(() => {
-    if (isSuperAdmin === undefined) return; // Wait for session
+    if (isSuperAdmin === undefined) return; 
     
     if (isSuperAdmin) {
       loadApiData();
@@ -144,7 +145,6 @@ export default function Dashboard() {
       )
   }
 
-  // Handle case where data might still be null after loading
   if (!data) {
       return (
           <div className="flex flex-col items-center justify-center min-h-screen text-gray-400">
@@ -351,6 +351,15 @@ export default function Dashboard() {
           </div>
       </div>
     </div>
+  );
+}
+
+// 2. Wrap main component in Suspense
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-400">Loading dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
 
