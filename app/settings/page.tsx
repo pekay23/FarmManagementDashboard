@@ -9,7 +9,6 @@ import { useSync } from '@/context/SyncContext';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('general');
-  // ✅ FIX 1: Initialize with safe defaults (empty strings)
   const [formData, setFormData] = useState({
     farm_name: '',
     logo: '', 
@@ -28,14 +27,14 @@ export default function SettingsPage() {
   useEffect(() => {
     async function fetchSettings() {
         try {
-            const res = await fetch('/api/settings');
+            // ✅ Fix: Prevent caching
+            const res = await fetch('/api/settings', { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
-                // ✅ FIX 2: Ensure no nulls when updating state
                 setFormData(prev => ({
                     ...prev,
                     ...data,
-                    phone: data.phone || '', // Fallback to empty string
+                    phone: data.phone || '',
                     email: data.email || '',
                     address: data.address || '',
                     receipt_footer: data.receipt_footer || '',
@@ -74,6 +73,12 @@ export default function SettingsPage() {
   const handleLogoUpload = (e: any) => {
       const file = e.target.files[0];
       if (file) {
+          // ✅ Fix: Limit file size to 800KB to prevent Payload Too Large errors
+          if (file.size > 800 * 1024) {
+              toast.error("Image too large. Please use an image under 800KB.");
+              return;
+          }
+
           const reader = new FileReader();
           reader.onloadend = () => {
               setFormData(prev => ({ ...prev, logo: reader.result as string }));
@@ -88,18 +93,26 @@ export default function SettingsPage() {
     
     try {
         if (navigator.onLine) {
-            await fetch('/api/settings', {
+            const res = await fetch('/api/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             });
+
+            // ✅ Fix: Explicitly check for server error
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || "Server failed to save settings");
+            }
+
             toast.success("Configuration saved! Reloading...");
             setTimeout(() => window.location.reload(), 1000); 
         } else {
             toast.error("You must be online to update farm configuration.");
         }
-    } catch (err) {
-        toast.error("Failed to save settings");
+    } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to save settings");
     } finally {
         setLoading(false);
     }
@@ -194,14 +207,13 @@ export default function SettingsPage() {
                                   <Upload className="w-4 h-4" /> Upload Image
                                   <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
                               </label>
-                              <p className="text-xs text-gray-500 mt-2">Recommended: Square PNG/JPG, max 1MB.</p>
+                              <p className="text-xs text-gray-500 mt-2">Recommended: Square PNG/JPG, max 800KB.</p>
                           </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                           <div>
                               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Farm Name</label>
-                              {/* ✅ FIX 3: Add value={... || ''} just in case */}
                               <input name="farm_name" value={formData.farm_name || ''} onChange={handleChange} className="w-full border p-3 rounded-lg outline-none focus:border-primary-500" placeholder="e.g. Hughes Farms" />
                           </div>
                           <div>
@@ -290,7 +302,6 @@ export default function SettingsPage() {
                               <span className="text-gray-500">App Version</span>
                               <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">v1.2.0</span>
                           </div>
-                          
                           <div className="flex justify-between py-3 border-b border-gray-50">
                               <span className="text-gray-500">Connection</span>
                               <span className={`font-bold flex items-center gap-2 ${isOnline ? 'text-green-600' : 'text-orange-500'}`}>
@@ -304,7 +315,6 @@ export default function SettingsPage() {
                                   {isSyncing ? 'Syncing...' : 'Idle'}
                               </span>
                           </div>
-
                           <div className="flex justify-between py-3 border-b border-gray-50">
                               <span className="text-gray-500">PWA Mode</span>
                               <div className="flex items-center gap-2">
@@ -314,7 +324,6 @@ export default function SettingsPage() {
                                 </span>
                               </div>
                           </div>
-
                           <div className="flex justify-between py-3 border-b border-gray-50">
                               <span className="text-gray-500">Database Engine</span>
                               <span className="font-mono text-gray-700 flex items-center gap-2">
@@ -330,7 +339,6 @@ export default function SettingsPage() {
                       </div>
                   </div>
               )}
-
           </div>
       </div>
     </div>

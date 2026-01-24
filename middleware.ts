@@ -7,17 +7,8 @@ export default withAuth({
 });
 
 export const config = {
+  // Corrected matcher regex to ignore static files and PWA assets
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico, site.webmanifest (PWA files)
-     * - sw.js, workbox-*.js (Service Workers)
-     * - login (Login page - excluded to prevent loops)
-     * - Public images (svg, png, jpg)
-     */
     "/((?!api|_next/static|_next/image|favicon.ico|site.webmanifest|sw.js|workbox-.*|login|.*\\.png$|.*\\.jpg$|.*\\.svg$).*)",
   ],
 };
