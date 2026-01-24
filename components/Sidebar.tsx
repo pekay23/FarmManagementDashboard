@@ -1,23 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react"; // ✅ Added useEffect
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from 'next-auth/react'; // ✅ Import useSession
+import { useSession, signOut } from 'next-auth/react'; 
 import SyncStatus from "@/components/SyncStatus";
-import { logoBase64 } from "@/lib/logo";
+import { logoBase64 } from "@/lib/logo"; // Default logo
 import { 
   Menu, X, Home, Tractor, Settings, Beef, Package, 
   Users, ClipboardList, DollarSign, BarChart3, TrendingDown,
-  Shield // ✅ Added Shield
+  Shield, LogOut 
 } from "lucide-react";
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
-  
-  // ✅ Get the session data inside the component
   const { data: session } = useSession(); 
+  
+  // ✅ State for Dynamic Branding
+  const [brand, setBrand] = useState({ name: 'Hughes Farms', logo: '' });
+
+  // ✅ Fetch dynamic branding on mount
+  useEffect(() => {
+      fetch('/api/settings')
+        .then(res => res.json())
+        .then(data => {
+            if (data.farm_name) {
+                // Use fetched data, fallback to defaults if empty
+                setBrand({ 
+                    name: data.farm_name, 
+                    logo: data.logo || '' 
+                });
+            }
+        })
+        .catch(err => console.error("Failed to load brand"));
+  }, []);
 
   const links = [
     { name: "Dashboard", href: "/", icon: Home },
@@ -37,8 +54,13 @@ export default function Sidebar() {
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 w-full bg-emerald-900 z-50 p-4 border-b border-white/10 flex justify-between items-center text-white shadow-md">
         <div className="flex items-center gap-3">
-            <img src={logoBase64} alt="Logo" className="w-8 h-8 object-contain drop-shadow-md" />
-            <span className="font-bold text-lg tracking-wide">Hughes Farms</span>
+            {/* ✅ Dynamic Mobile Logo */}
+            {brand.logo ? (
+                <img src={brand.logo} alt="Logo" className="w-8 h-8 object-contain drop-shadow-md" />
+            ) : (
+                <img src={logoBase64} alt="Logo" className="w-8 h-8 object-contain drop-shadow-md" />
+            )}
+            <span className="font-bold text-lg tracking-wide">{brand.name}</span>
         </div>
         <button onClick={() => setIsOpen(!isOpen)} className="p-1 hover:bg-white/10 rounded-md">
             {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -53,14 +75,30 @@ export default function Sidebar() {
         {/* Brand Section */}
         <div className="flex items-center gap-3 px-6 py-6 border-b border-white/10 bg-emerald-950/20">
            <div className="bg-white/10 p-2 rounded-xl backdrop-blur-sm shadow-sm border border-white/5">
-             <img 
-               src={logoBase64} 
-               className="w-10 h-10 object-contain drop-shadow-md" 
-               alt="Hughes Farms Logo"
-             />
+             {/* ✅ Dynamic Sidebar Logo */}
+             {brand.logo ? (
+                 <img 
+                   src={brand.logo} 
+                   className="w-10 h-10 object-contain drop-shadow-md" 
+                   alt="Farm Logo"
+                 />
+             ) : (
+                 <img 
+                   src={logoBase64} 
+                   className="w-10 h-10 object-contain drop-shadow-md" 
+                   alt="Hughes Farms Logo"
+                 />
+             )}
            </div>
            <div>
-             <h1 className="font-bold text-lg leading-tight tracking-wide text-white">Hughes<br/>Farms</h1>
+             {/* ✅ Dynamic Farm Name */}
+             <h1 className="font-bold text-lg leading-tight tracking-wide text-white">
+                {brand.name === 'Hughes Farms' ? (
+                    <>Hughes<br/>Farms</>
+                ) : (
+                    brand.name
+                )}
+             </h1>
            </div>
         </div>
 
@@ -87,7 +125,7 @@ export default function Sidebar() {
             );
           })}
 
-          {/* ✅ ADMIN SECTION: Only visible to Admins */}
+          {/* ADMIN SECTION */}
           {(session?.user as any)?.role === 'Admin' && (
             <div className="pt-2 mt-2 border-t border-white/10">
                 <Link 
@@ -106,8 +144,16 @@ export default function Sidebar() {
           )}
         </nav>
 
-        {/* Sync Status Footer */}
-        <div className="p-4 bg-black/20 border-t border-white/5">
+        {/* Footer Area with Sign Out and Sync Status */}
+        <div className="p-4 bg-black/20 border-t border-white/5 space-y-3">
+            <button 
+                onClick={() => signOut({ callbackUrl: '/login' })}
+                className="flex w-full items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium text-red-200 hover:bg-red-900/20 hover:text-white transition-colors"
+            >
+                <LogOut className="w-5 h-5" />
+                Sign Out
+            </button>
+
             <SyncStatus />
         </div>
       </aside>

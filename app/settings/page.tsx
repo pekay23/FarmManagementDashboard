@@ -2,15 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Save, RefreshCw, Server, User, Database, Globe, Download, LogOut, Trash2, Smartphone, Wifi, WifiOff } from 'lucide-react';
+import { Save, RefreshCw, Server, User, Database, Globe, Download, LogOut, Trash2, Smartphone, Wifi, WifiOff, Upload } from 'lucide-react';
 import { db } from '@/lib/db';
 import { signOut, useSession } from 'next-auth/react';
-import { useSync } from '@/context/SyncContext'; // Import SyncContext for real status
+import { useSync } from '@/context/SyncContext';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('general');
+  // ✅ FIX 1: Initialize with safe defaults (empty strings)
   const [formData, setFormData] = useState({
     farm_name: '',
+    logo: '', 
     phone: '',
     email: '',
     address: '',
@@ -19,23 +21,39 @@ export default function SettingsPage() {
   });
   const [loading, setLoading] = useState(false);
   const { data: session } = useSession();
-  const { isOnline, isSyncing } = useSync(); // Get real-time sync status
+  const { isOnline, isSyncing } = useSync();
   const [isPWA, setIsPWA] = useState(false);
   const [dbInfo, setDbInfo] = useState({ name: 'Loading...', version: 0, tables: 0 });
 
   useEffect(() => {
-    const saved = localStorage.getItem('farmSettings');
-    if (saved) {
-        setFormData(JSON.parse(saved));
+    async function fetchSettings() {
+        try {
+            const res = await fetch('/api/settings');
+            if (res.ok) {
+                const data = await res.json();
+                // ✅ FIX 2: Ensure no nulls when updating state
+                setFormData(prev => ({
+                    ...prev,
+                    ...data,
+                    phone: data.phone || '', // Fallback to empty string
+                    email: data.email || '',
+                    address: data.address || '',
+                    receipt_footer: data.receipt_footer || '',
+                    logo: data.logo || '',
+                    tax_rate: data.tax_rate || 0
+                }));
+            }
+        } catch (e) {
+            console.error("Failed to load settings");
+        }
     }
+    fetchSettings();
 
-    // Check PWA status
     if (typeof window !== 'undefined') {
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
         setIsPWA(isStandalone);
     }
 
-    // Get DB Info
     async function getDbStats() {
         if (db) {
             setDbInfo({
@@ -53,10 +71,20 @@ export default function SettingsPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleLogoUpload = (e: any) => {
+      const file = e.target.files[0];
+      if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+              setFormData(prev => ({ ...prev, logo: reader.result as string }));
+          };
+          reader.readAsDataURL(file);
+      }
+  };
+
   const handleSave = async (e: any) => {
     e.preventDefault();
     setLoading(true);
-    localStorage.setItem('farmSettings', JSON.stringify(formData));
     
     try {
         if (navigator.onLine) {
@@ -65,12 +93,13 @@ export default function SettingsPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             });
-            toast.success("Settings saved & synced to cloud");
+            toast.success("Configuration saved! Reloading...");
+            setTimeout(() => window.location.reload(), 1000); 
         } else {
-            toast.success("Settings saved locally (Offline)");
+            toast.error("You must be online to update farm configuration.");
         }
     } catch (err) {
-        toast.warning("Saved locally only");
+        toast.error("Failed to save settings");
     } finally {
         setLoading(false);
     }
@@ -147,36 +176,55 @@ export default function SettingsPage() {
 
           <div className="md:col-span-3 bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[400px]">
               
-              {/* --- GENERAL TAB --- */}
               {activeTab === 'general' && (
-                  <form onSubmit={handleSave} className="space-y-5 animate-in fade-in duration-300">
-                      <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Farm Configuration</h2>
+                  <form onSubmit={handleSave} className="space-y-6 animate-in fade-in duration-300">
+                      <h2 className="text-lg font-bold text-gray-800 border-b pb-2">Farm Configuration</h2>
+                      
+                      <div className="flex items-center gap-6">
+                          <div className="w-24 h-24 bg-gray-100 rounded-xl flex items-center justify-center border-2 border-dashed border-gray-300 overflow-hidden relative">
+                              {formData.logo ? (
+                                  <img src={formData.logo} alt="Logo" className="w-full h-full object-contain" />
+                              ) : (
+                                  <span className="text-xs text-gray-400">No Logo</span>
+                              )}
+                          </div>
+                          <div>
+                              <label className="block text-sm font-bold text-gray-700 mb-2">Farm Logo</label>
+                              <label className="cursor-pointer bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-2 w-fit">
+                                  <Upload className="w-4 h-4" /> Upload Image
+                                  <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                              </label>
+                              <p className="text-xs text-gray-500 mt-2">Recommended: Square PNG/JPG, max 1MB.</p>
+                          </div>
+                      </div>
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                           <div>
                               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Farm Name</label>
-                              <input name="farm_name" value={formData.farm_name} onChange={handleChange} className="w-full border p-3 rounded-lg outline-none focus:border-primary-500" placeholder="e.g. Hughes Farms" />
+                              {/* ✅ FIX 3: Add value={... || ''} just in case */}
+                              <input name="farm_name" value={formData.farm_name || ''} onChange={handleChange} className="w-full border p-3 rounded-lg outline-none focus:border-primary-500" placeholder="e.g. Hughes Farms" />
                           </div>
                           <div>
                               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone Number</label>
-                              <input name="phone" value={formData.phone} onChange={handleChange} className="w-full border p-3 rounded-lg outline-none focus:border-primary-500" placeholder="+233..." />
+                              <input name="phone" value={formData.phone || ''} onChange={handleChange} className="w-full border p-3 rounded-lg outline-none focus:border-primary-500" placeholder="+233..." />
                           </div>
                       </div>
                       <div>
                           <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email Address</label>
-                          <input name="email" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded-lg outline-none focus:border-primary-500" />
+                          <input name="email" value={formData.email || ''} onChange={handleChange} className="w-full border p-3 rounded-lg outline-none focus:border-primary-500" />
                       </div>
                       <div>
                           <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Address</label>
-                          <textarea name="address" rows={2} value={formData.address} onChange={handleChange} className="w-full border p-3 rounded-lg outline-none focus:border-primary-500 resize-none" />
+                          <textarea name="address" rows={2} value={formData.address || ''} onChange={handleChange} className="w-full border p-3 rounded-lg outline-none focus:border-primary-500 resize-none" />
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                           <div>
                               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Receipt Footer</label>
-                              <input name="receipt_footer" value={formData.receipt_footer} onChange={handleChange} className="w-full border p-3 rounded-lg outline-none focus:border-primary-500" />
+                              <input name="receipt_footer" value={formData.receipt_footer || ''} onChange={handleChange} className="w-full border p-3 rounded-lg outline-none focus:border-primary-500" />
                           </div>
                           <div>
                               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tax Rate (%)</label>
-                              <input name="tax_rate" type="number" step="0.1" value={formData.tax_rate} onChange={handleChange} className="w-full border p-3 rounded-lg outline-none focus:border-primary-500" />
+                              <input name="tax_rate" type="number" step="0.1" value={formData.tax_rate || 0} onChange={handleChange} className="w-full border p-3 rounded-lg outline-none focus:border-primary-500" />
                           </div>
                       </div>
                       <div className="pt-4 flex justify-end">
@@ -188,14 +236,12 @@ export default function SettingsPage() {
                   </form>
               )}
 
-              {/* --- ACCOUNT TAB --- */}
               {activeTab === 'account' && (
                   <div className="space-y-6 animate-in fade-in duration-300">
                       <h2 className="text-lg font-bold text-gray-800 border-b pb-2">Account Details</h2>
                       <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                           <p className="text-xs text-gray-500 uppercase font-bold mb-1">Logged in as</p>
                           <p className="text-lg font-medium text-gray-900">{session?.user?.email || 'Offline User'}</p>
-                          {/* ✅ FIX: Dynamic Role */}
                           <p className="text-sm text-gray-500 mt-1">Role: <span className="font-semibold text-primary-700">{(session?.user as any)?.role || 'Viewer'}</span></p>
                       </div>
                       <div className="flex gap-4 pt-2">
@@ -209,7 +255,6 @@ export default function SettingsPage() {
                   </div>
               )}
 
-              {/* --- BACKUP TAB --- */}
               {activeTab === 'backup' && (
                   <div className="space-y-6 animate-in fade-in duration-300">
                       <h2 className="text-lg font-bold text-gray-800 border-b pb-2">Data Management</h2>
@@ -237,7 +282,6 @@ export default function SettingsPage() {
                   </div>
               )}
 
-              {/* --- SYSTEM TAB --- */}
               {activeTab === 'api' && (
                   <div className="space-y-6 animate-in fade-in duration-300">
                       <h2 className="text-lg font-bold text-gray-800 border-b pb-2">System Information</h2>
@@ -247,7 +291,6 @@ export default function SettingsPage() {
                               <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">v1.2.0</span>
                           </div>
                           
-                          {/* ✅ FIX: Dynamic Connection Status */}
                           <div className="flex justify-between py-3 border-b border-gray-50">
                               <span className="text-gray-500">Connection</span>
                               <span className={`font-bold flex items-center gap-2 ${isOnline ? 'text-green-600' : 'text-orange-500'}`}>
@@ -262,7 +305,6 @@ export default function SettingsPage() {
                               </span>
                           </div>
 
-                          {/* ✅ FIX: Dynamic PWA Status */}
                           <div className="flex justify-between py-3 border-b border-gray-50">
                               <span className="text-gray-500">PWA Mode</span>
                               <div className="flex items-center gap-2">
@@ -273,7 +315,6 @@ export default function SettingsPage() {
                               </div>
                           </div>
 
-                          {/* ✅ FIX: Dynamic DB Info */}
                           <div className="flex justify-between py-3 border-b border-gray-50">
                               <span className="text-gray-500">Database Engine</span>
                               <span className="font-mono text-gray-700 flex items-center gap-2">
@@ -296,7 +337,6 @@ export default function SettingsPage() {
   );
 }
 
-// Icon helper
 function AlertTriangle(props: any) {
     return (
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>

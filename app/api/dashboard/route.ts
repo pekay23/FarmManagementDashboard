@@ -1,13 +1,24 @@
 import { NextResponse } from 'next/server';
-import pool from '@/lib/pg'; // Use the Server DB connection
+import pool from '@/lib/pg';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 
-// Force dynamic so it doesn't cache old data
 export const dynamic = 'force-dynamic';
+
+async function getFarmId() {
+  const session = await getServerSession(authOptions);
+  if (!session || !(session.user as any).farm_id) {
+    throw new Error('Unauthorized');
+  }
+  return (session.user as any).farm_id;
+}
 
 export async function GET() {
   const client = await pool.connect();
   
   try {
+    const farm_id = await getFarmId(); // 🔒 Secure check
+
     // 1. Run all independent queries in PARALLEL for speed
     const [
       cropsCountRes,
@@ -21,42 +32,43 @@ export async function GET() {
       recentSalesRes,
       recentTasksRes
     ] = await Promise.all([
-      // KPIs
-      client.query('SELECT COUNT(*) FROM crops'),
-      client.query('SELECT COUNT(*) FROM livestock'),
-      client.query('SELECT SUM(amount) FROM sales'),
-      client.query("SELECT COUNT(*) FROM tasks WHERE status = 'Pending'"),
+      // KPIs - Scoped to farm_id
+      client.query('SELECT COUNT(*) FROM crops WHERE farm_id = $1', [farm_id]),
+      client.query('SELECT COUNT(*) FROM livestock WHERE farm_id = $1', [farm_id]),
+      client.query('SELECT SUM(total_amount) FROM sales WHERE farm_id = $1', [farm_id]),
+      client.query("SELECT COUNT(*) FROM tasks WHERE status = 'Pending' AND farm_id = $1", [farm_id]),
       
-      // Alerts: Low Stock (using standard SQL)
-      client.query('SELECT name, quantity, unit FROM inventory WHERE quantity <= low_stock_threshold LIMIT 3'),
+      // Alerts: Low Stock - Scoped
+      client.query('SELECT item_name as name, quantity, unit FROM inventory WHERE quantity <= min_threshold AND farm_id = $1 LIMIT 3', [farm_id]),
       
-      // Alerts: Overdue Tasks
-      client.query("SELECT title, due_date FROM tasks WHERE status != 'Completed' AND due_date < CURRENT_DATE LIMIT 3"),
+      // Alerts: Overdue Tasks - Scoped
+      client.query("SELECT title, due_date FROM tasks WHERE status != 'Completed' AND due_date < CURRENT_DATE AND farm_id = $1 LIMIT 3", [farm_id]),
       
-      // Upcoming Harvests (Next 14 days)
+      // Upcoming Harvests (Next 14 days) - Scoped
       client.query(`
         SELECT crop_type, plot_number, expected_harvest_date 
         FROM crops 
         WHERE status = 'Growing' 
         AND expected_harvest_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '14 days'
+        AND farm_id = $1
         ORDER BY expected_harvest_date ASC
         LIMIT 5
-      `),
+      `, [farm_id]),
       
-      // Sales Trend (Last 7 Days)
+      // Sales Trend (Last 7 Days) - Scoped
       client.query(`
-        SELECT TO_CHAR(date, 'Mon DD') as name, SUM(amount) as value 
+        SELECT TO_CHAR(sale_date, 'Mon DD') as name, SUM(total_amount) as value 
         FROM sales 
-        WHERE date >= NOW() - INTERVAL '7 days'
-        GROUP BY TO_CHAR(date, 'Mon DD'), date 
-        ORDER BY date
-      `),
+        WHERE sale_date >= NOW() - INTERVAL '7 days' AND farm_id = $1
+        GROUP BY TO_CHAR(sale_date, 'Mon DD'), sale_date 
+        ORDER BY sale_date
+      `, [farm_id]),
 
-      // Recent Activity: Sales
-      client.query("SELECT 'sale' as type, customer, date, amount FROM sales ORDER BY date DESC LIMIT 5"),
+      // Recent Activity: Sales - Scoped
+      client.query("SELECT 'sale' as type, buyer_name as customer, sale_date as date, total_amount as amount FROM sales WHERE farm_id = $1 ORDER BY sale_date DESC LIMIT 5", [farm_id]),
       
-      // Recent Activity: Tasks
-      client.query("SELECT 'task' as type, title, updated_at as date, status FROM tasks WHERE status = 'Completed' ORDER BY updated_at DESC LIMIT 5")
+      // Recent Activity: Tasks - Scoped
+      client.query("SELECT 'task' as type, title, updated_at as date, status FROM tasks WHERE status = 'Completed' AND farm_id = $1 ORDER BY updated_at DESC LIMIT 5", [farm_id])
     ]);
 
     // 2. Format the Activity Feed (Combine Sales & Tasks)
@@ -98,9 +110,9 @@ export async function GET() {
       activity: activityFeed
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Dashboard API Error:", error);
-    return NextResponse.json({ error: 'Failed to fetch dashboard data' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch dashboard data' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
   } finally {
     client.release();
   }

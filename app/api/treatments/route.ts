@@ -1,31 +1,40 @@
 import { NextResponse } from 'next/server';
-import pool from '@/lib/pg'; // Server DB connection
+import pool from '@/lib/pg'; 
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 
-export const dynamic = 'force-dynamic'; // Ensure fresh data
+export const dynamic = 'force-dynamic';
+
+async function getFarmId() {
+  const session = await getServerSession(authOptions);
+  if (!session || !(session.user as any).farm_id) {
+    throw new Error('Unauthorized');
+  }
+  return (session.user as any).farm_id;
+}
 
 // GET treatments
-// If ?crop_id=ALL or no crop_id is provided, return ALL treatments (for Sync)
-// If ?crop_id=UUID is provided, return treatments for that specific crop
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const crop_id = searchParams.get('crop_id');
-
   const client = await pool.connect();
+  
   try {
-    let query = 'SELECT * FROM crop_treatments ORDER BY treatment_date DESC';
-    let values: any[] = [];
+    const farm_id = await getFarmId(); // 🔒 Secure check
+    let query = 'SELECT * FROM crop_treatments WHERE farm_id = $1 ORDER BY treatment_date DESC';
+    let values: any[] = [farm_id];
 
     // Only filter if crop_id is provided AND it's not "ALL"
     if (crop_id && crop_id !== 'ALL') {
-        query = 'SELECT * FROM crop_treatments WHERE crop_id = $1 ORDER BY treatment_date DESC';
-        values = [crop_id];
+        query = 'SELECT * FROM crop_treatments WHERE farm_id = $1 AND crop_id = $2 ORDER BY treatment_date DESC';
+        values = [farm_id, crop_id];
     }
 
     const result = await client.query(query, values);
     return NextResponse.json(result.rows);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Fetch treatments error:', error);
-    return NextResponse.json({ error: 'Failed to fetch treatments' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch treatments' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
   } finally {
     client.release();
   }
@@ -35,22 +44,29 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const client = await pool.connect();
   try {
+    const farm_id = await getFarmId(); // 🔒 Secure check
     const body = await request.json();
     const { crop_id, treatment_type, product_name, treatment_date, quantity, cost, notes } = body;
 
+    // Verify crop ownership first
+    const check = await client.query('SELECT id FROM crops WHERE id = $1 AND farm_id = $2', [crop_id, farm_id]);
+    if (check.rowCount === 0) {
+        return NextResponse.json({ error: 'Crop not found or access denied' }, { status: 404 });
+    }
+
     const query = `
-      INSERT INTO crop_treatments (crop_id, treatment_type, product_name, treatment_date, quantity, cost, notes)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO crop_treatments (farm_id, crop_id, treatment_type, product_name, treatment_date, quantity, cost, notes)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `;
 
-    const values = [crop_id, treatment_type, product_name, treatment_date, quantity, cost, notes];
-
+    const values = [farm_id, crop_id, treatment_type, product_name, treatment_date, quantity, cost, notes];
     const result = await client.query(query, values);
+    
     return NextResponse.json(result.rows[0]);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Save treatment error:', error);
-    return NextResponse.json({ error: 'Failed to save treatment' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to save treatment' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
   } finally {
     client.release();
   }

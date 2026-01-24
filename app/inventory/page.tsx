@@ -9,7 +9,7 @@ import {
   X, Loader2, Pencil, Trash2, CheckCircle 
 } from 'lucide-react';
 
-// ✅ SAFE UUID GENERATOR (Works on all devices/networks)
+// ✅ SAFE UUID GENERATOR
 function generateUUID() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -22,8 +22,6 @@ function generateUUID() {
 }
 
 export default function Inventory() {
-  // 1. REAL-TIME DATA
-  // Filter out deleted items locally so they disappear immediately from UI
   const items = useLiveQuery(() => 
     db.inventory
       .filter(i => i.syncStatus !== 'deleted')
@@ -32,12 +30,11 @@ export default function Inventory() {
   ) || [];
   
   const [activeCategory, setActiveCategory] = useState('All');
-  
-  // Modal & Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
-
-  // --- ACTIONS (Offline First) ---
+  
+  // ✅ New State for Delete Modal
+  const [confirmDelete, setConfirmDelete] = useState<any>(null);
 
   async function handleSubmit(e: any) {
     e.preventDefault();
@@ -57,7 +54,6 @@ export default function Inventory() {
             await db.inventory.update(editingItem.id, { ...formData, syncStatus: 'updated' });
             toast.success("Item updated");
         } else {
-            // ✅ USE SAFE UUID
             await db.inventory.add({ 
                 id: generateUUID(), 
                 ...formData, 
@@ -73,24 +69,24 @@ export default function Inventory() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('Are you sure?')) return;
+  // ✅ Updated Delete Logic
+  async function handleDelete() {
+    if (!confirmDelete) return;
     try {
-        const item = await db.inventory.get(id);
-        // If it was never synced, just delete it locally
+        const item = await db.inventory.get(confirmDelete.id);
         if (item && item.syncStatus === 'pending') {
-            await db.inventory.delete(id);
+            await db.inventory.delete(confirmDelete.id);
         } else {
-            // Otherwise mark for deletion so sync picks it up
-            await db.inventory.update(id, { syncStatus: 'deleted', updatedAt: new Date().toISOString() });
+            await db.inventory.update(confirmDelete.id, { syncStatus: 'deleted', updatedAt: new Date().toISOString() });
         }
         toast.success("Item deleted");
     } catch (err) {
         toast.error("Delete failed");
+    } finally {
+        setConfirmDelete(null);
     }
   }
 
-  // Filter Logic
   const categories = ['All', 'Seeds', 'Fertilizers', 'Pesticides', 'Feeds', 'Medicines', 'Low Stock'];
   
   const filteredItems = items.filter(item => {
@@ -100,13 +96,11 @@ export default function Inventory() {
   });
 
   const lowStockCount = items.filter(i => i.quantity <= i.lowStockThreshold).length;
-  // Fallback for unitPrice since it might be undefined on old records
   const totalValue = items.reduce((acc, item) => acc + (item.quantity * (item.unitPrice || 0)), 0);
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto relative pb-20">
       
-      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
@@ -121,14 +115,12 @@ export default function Inventory() {
         </button>
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <InventoryKpi title="Total Items" value={items.length.toString()} icon={Package} color="blue" />
         <InventoryKpi title="Low Stock Items" value={lowStockCount.toString()} icon={AlertTriangle} color="red" />
         <InventoryKpi title="Total Value" value={`GH₵ ${totalValue.toLocaleString()}`} icon={TrendingDown} color="green" />
       </div>
 
-      {/* Filters */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-col md:flex-row justify-between gap-4">
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 md:pb-0">
           {categories.map(cat => (
@@ -144,7 +136,6 @@ export default function Inventory() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {!items ? (
             <div className="p-10 flex justify-center text-gray-400"><Loader2 className="w-8 h-8 animate-spin" /></div>
@@ -190,7 +181,8 @@ export default function Inventory() {
                             <button onClick={() => { setEditingItem(item); setIsModalOpen(true); }} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 hover:text-primary-600 transition-colors">
                                 <Pencil className="w-4 h-4" />
                             </button>
-                            <button onClick={() => handleDelete(item.id)} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 hover:text-red-600 transition-colors">
+                            {/* ✅ OPEN DELETE MODAL INSTEAD OF WINDOW.CONFIRM */}
+                            <button onClick={() => setConfirmDelete(item)} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 hover:text-red-600 transition-colors">
                                 <Trash2 className="w-4 h-4" />
                             </button>
                         </td>
@@ -203,7 +195,25 @@ export default function Inventory() {
         )}
       </div>
 
-      {/* Add/Edit Modal */}
+      {/* ✅ DELETE CONFIRMATION MODAL */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-xl w-full max-w-sm p-6 shadow-2xl text-center animate-in zoom-in-95">
+                <div className="bg-red-50 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                    <AlertTriangle className="w-8 h-8 text-red-500"/>
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Item?</h3>
+                <p className="text-gray-500 text-sm mb-6">
+                    Are you sure you want to delete <strong>{confirmDelete.name}</strong>? This action cannot be undone.
+                </p>
+                <div className="flex gap-3">
+                    <button onClick={() => setConfirmDelete(null)} className="flex-1 py-2.5 bg-gray-100 rounded-lg font-bold text-gray-600 hover:bg-gray-200">Cancel</button>
+                    <button onClick={handleDelete} className="flex-1 py-2.5 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700">Delete</button>
+                </div>
+            </div>
+        </div>
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95">

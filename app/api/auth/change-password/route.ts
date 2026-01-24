@@ -1,17 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth";
 import { hash } from "bcryptjs";
-import { Pool } from 'pg';
+import pool from '@/lib/pg'; // ✅ Use shared pool
 import { authOptions } from "@/lib/auth"; 
 
-// 1. SSL for Neon
-const pool = new Pool({ 
-  connectionString: process.env.DATABASE_URL,
-  ssl: true 
-});
-
 export async function POST(req: Request) {
-  // 2. Pass authOptions to getServerSession to fix the "Not authenticated" error
   const session = await getServerSession(authOptions);
 
   if (!session || !session.user?.email) {
@@ -20,7 +13,6 @@ export async function POST(req: Request) {
 
   const { newPassword } = await req.json();
 
-  // 3. Basic Validation
   if (!newPassword || newPassword.length < 6) {
     return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
   }
@@ -29,6 +21,7 @@ export async function POST(req: Request) {
   const client = await pool.connect();
 
   try {
+    // Update password for the logged-in user
     await client.query("UPDATE users SET password = $1 WHERE email = $2", [hashedPassword, session.user.email]);
     return NextResponse.json({ message: "Password updated successfully" });
   } catch (e) {

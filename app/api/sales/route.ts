@@ -1,11 +1,23 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/pg';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
+
+async function getFarmId() {
+  const session = await getServerSession(authOptions);
+  if (!session || !(session.user as any).farm_id) {
+    throw new Error('Unauthorized');
+  }
+  return (session.user as any).farm_id;
+}
 
 export async function GET() {
   const client = await pool.connect();
   try {
+    const farm_id = await getFarmId(); // 🔒 Secure check
+
     const query = `
       SELECT 
         s.id, 
@@ -13,7 +25,7 @@ export async function GET() {
         s.contact_info, 
         s.total_amount as amount,
         s.sale_date as date,
-        s.sale_date as created_at, -- ✅ ALIAS sale_date as created_at for Sync
+        s.sale_date as created_at,
         s.status,
         json_agg(
           json_build_object(
@@ -24,15 +36,16 @@ export async function GET() {
         ) as "itemsData"
       FROM sales s
       LEFT JOIN sale_items si ON s.id = si.sale_id
+      WHERE s.farm_id = $1 -- 🔒 Scoped to farm
       GROUP BY s.id
       ORDER BY s.sale_date DESC
     `;
 
-    const result = await client.query(query);
+    const result = await client.query(query, [farm_id]);
     return NextResponse.json(result.rows);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Fetch sales error:', error);
-    return NextResponse.json({ error: 'Failed to fetch sales' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch sales' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
   } finally {
     client.release();
   }
@@ -41,7 +54,9 @@ export async function GET() {
 export async function POST(request: Request) {
   const client = await pool.connect();
   try {
+    const farm_id = await getFarmId(); // 🔒 Secure check
     const body = await request.json();
+    
     const buyerName = body.buyer_name || body.customer;
     const totalAmount = body.total_amount || body.amount;
     const contactInfo = body.contact_info;
@@ -50,38 +65,37 @@ export async function POST(request: Request) {
 
     await client.query('BEGIN');
 
-    // 1. Insert Sale
+    // 1. Insert Sale (Scoped to Farm)
     const saleQuery = `
-      INSERT INTO sales (buyer_name, contact_info, total_amount, status, sale_date)
-      VALUES ($1, $2, $3, 'Completed', CURRENT_TIMESTAMP)
+      INSERT INTO sales (farm_id, buyer_name, contact_info, total_amount, status, sale_date)
+      VALUES ($1, $2, $3, $4, 'Completed', CURRENT_TIMESTAMP)
       RETURNING *
     `;
-    const saleResult = await client.query(saleQuery, [buyerName, contactInfo, totalAmount]);
+    const saleResult = await client.query(saleQuery, [farm_id, buyerName, contactInfo, totalAmount]);
     const newSale = saleResult.rows[0];
 
-    // 2. Insert Items
+    // 2. Insert Items (Scoped to Farm)
     for (const item of items) {
       const name = item.item_name || item.name;
       const qty = item.quantity || item.qty;
       const price = item.price_at_sale || item.price;
 
       await client.query(
-        'INSERT INTO sale_items (sale_id, item_name, quantity, price_at_sale) VALUES ($1, $2, $3, $4)', 
-        [newSale.id, name, qty, price]
+        'INSERT INTO sale_items (farm_id, sale_id, item_name, quantity, price_at_sale) VALUES ($1, $2, $3, $4, $5)', 
+        [farm_id, newSale.id, name, qty, price]
       );
 
-      // 3. Deduct Inventory
+      // 3. Deduct Inventory (Scoped to Farm)
       if (deductInventory) {
         await client.query(
-          'UPDATE inventory SET quantity = quantity - $1, last_updated = CURRENT_TIMESTAMP WHERE item_name = $2',
-          [qty, name]
+          'UPDATE inventory SET quantity = quantity - $1, last_updated = CURRENT_TIMESTAMP WHERE item_name = $2 AND farm_id = $3',
+          [qty, name, farm_id]
         );
       }
     }
 
     await client.query('COMMIT');
 
-    // ✅ Return FULL object for SyncContext with created_at mapped
     return NextResponse.json({
         id: newSale.id,
         customer: newSale.buyer_name,
@@ -89,13 +103,13 @@ export async function POST(request: Request) {
         amount: newSale.total_amount,
         date: newSale.sale_date,
         itemsData: items,
-        created_at: newSale.sale_date // Map sale_date to created_at
+        created_at: newSale.sale_date 
     });
 
-  } catch (error) {
+  } catch (error: any) {
     await client.query('ROLLBACK');
     console.error('Record sale error:', error);
-    return NextResponse.json({ error: 'Failed to record sale' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to record sale' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
   } finally {
     client.release();
   }
@@ -104,25 +118,32 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const client = await pool.connect();
   try {
+    const farm_id = await getFarmId(); // 🔒 Secure check
     const { id } = await request.json();
 
     if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
     await client.query('BEGIN');
     
-    // Delete items first (Foreign Key Constraint)
+    // Verify ownership first
+    const check = await client.query('SELECT id FROM sales WHERE id = $1 AND farm_id = $2', [id, farm_id]);
+    if (check.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return NextResponse.json({ error: 'Sale not found or access denied' }, { status: 404 });
+    }
+
+    // Delete items first
     await client.query('DELETE FROM sale_items WHERE sale_id = $1', [id]);
     
     // Delete the sale record
     await client.query('DELETE FROM sales WHERE id = $1', [id]);
     
     await client.query('COMMIT');
-
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     await client.query('ROLLBACK');
     console.error('Delete sale error:', error);
-    return NextResponse.json({ error: 'Failed to delete sale' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to delete sale' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
   } finally {
     client.release();
   }
