@@ -20,13 +20,12 @@ export default function Sidebar() {
   // ✅ State for Dynamic Branding
   const [brand, setBrand] = useState({ name: 'Hughes Farms', logo: '' });
 
-  // ✅ Fetch dynamic branding on mount
+    // ✅ Fetch dynamic branding on mount (No Cache)
   useEffect(() => {
-      fetch('/api/settings')
+      fetch('/api/settings', { cache: 'no-store' }) // <--- Added { cache: 'no-store' }
         .then(res => res.json())
         .then(data => {
             if (data.farm_name) {
-                // Use fetched data, fallback to defaults if empty
                 setBrand({ 
                     name: data.farm_name, 
                     logo: data.logo || '' 
