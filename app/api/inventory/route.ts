@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/pg'; 
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { ApiError, apiErrorResponse, getSessionInfo, idValue, logAudit, numberValue, readJson, requirePermission, text } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
-async function getSessionInfo() {
-  const session = await getServerSession(authOptions);
-  if (!session) throw new Error('Unauthorized');
+function normalizeInventoryPayload(body: Record<string, unknown>) {
   return {
-    farm_id: (session.user as any).farm_id,
-    is_superadmin: (session.user as any).is_superadmin
+    name: text(body.item_name ?? body.name, 'item_name', { max: 160 }),
+    category: text(body.category, 'category', { max: 80 }),
+    quantity: numberValue(body.quantity, 'quantity', { min: 0 }),
+    unit: text(body.unit, 'unit', { max: 30 }),
+    threshold: numberValue(body.min_threshold ?? body.threshold, 'min_threshold', { min: 0 }),
+    price: numberValue(body.unit_price ?? body.price, 'unit_price', { min: 0 }),
+    supplier: text(body.supplier, 'supplier', { required: false, max: 160 }),
   };
 }
 
@@ -27,9 +29,8 @@ export async function GET() {
 
     const result = await pool.query(query, params);
     return NextResponse.json(result.rows);
-  } catch (error: any) {
-    console.error('Fetch inventory error:', error);
-    return NextResponse.json({ error: 'Failed to fetch inventory' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
+  } catch (error: unknown) {
+    return apiErrorResponse(error, 'Failed to fetch inventory');
   }
 }
 
@@ -37,15 +38,11 @@ export async function GET() {
 export async function POST(request: Request) {
   const client = await pool.connect();
   try {
-    const { farm_id } = await getSessionInfo();
-    if (!farm_id) throw new Error('Unauthorized'); // Strict: Only farm owners can create
-
-    const body = await request.json();
-    const { name, category, quantity, unit, threshold, price, supplier, item_name, min_threshold, unit_price } = body;
-
-    const dbName = item_name || name;
-    const dbThreshold = min_threshold || threshold;
-    const dbPrice = unit_price || price;
+    const session = await requirePermission('inventory:write');
+    if (!session.farm_id) throw new ApiError('Farm workspace required', 403);
+    const { farm_id } = session;
+    const body = await readJson(request);
+    const item = normalizeInventoryPayload(body);
 
     const query = `
       INSERT INTO inventory (farm_id, item_name, category, quantity, unit, min_threshold, unit_price, status, supplier, last_updated)
@@ -53,12 +50,12 @@ export async function POST(request: Request) {
       RETURNING *
     `;
 
-    const values = [farm_id, dbName, category, quantity, unit, dbThreshold, dbPrice, supplier];
+    const values = [farm_id, item.name, item.category, item.quantity, item.unit, item.threshold, item.price, item.supplier];
     const result = await client.query(query, values);
+    await logAudit(session, 'inventory.created', 'inventory', result.rows[0].id, { item_name: item.name, quantity: item.quantity });
     return NextResponse.json(result.rows[0]);
-  } catch (error: any) {
-    console.error('Add inventory error:', error);
-    return NextResponse.json({ error: 'Failed to add item' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
+  } catch (error: unknown) {
+    return apiErrorResponse(error, 'Failed to add item');
   } finally {
     client.release();
   }
@@ -67,19 +64,17 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const client = await pool.connect();
   try {
-    const { farm_id, is_superadmin } = await getSessionInfo();
-    const body = await request.json();
-    const { id, name, category, quantity, unit, threshold, price, supplier, item_name, min_threshold, unit_price } = body;
-
-    const dbName = item_name || name;
-    const dbThreshold = min_threshold || threshold;
-    const dbPrice = unit_price || price;
+    const session = await requirePermission('inventory:write');
+    const { farm_id, is_superadmin } = session;
+    const body = await readJson(request);
+    const id = idValue(body.id);
+    const item = normalizeInventoryPayload(body);
     
     let whereClause = "WHERE id = $8";
-    let values = [dbName, category, quantity, unit, dbThreshold, dbPrice, supplier, id];
+    const values = [item.name, item.category, item.quantity, item.unit, item.threshold, item.price, item.supplier, id];
 
     if (!is_superadmin) {
-        if (!farm_id) throw new Error('Unauthorized');
+        if (!farm_id) throw new ApiError('Unauthorized', 401);
         whereClause += ' AND farm_id = $9';
         values.push(farm_id);
     }
@@ -98,10 +93,10 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Item not found or access denied' }, { status: 404 });
     }
 
+    await logAudit(session, 'inventory.updated', 'inventory', id, { item_name: item.name, quantity: item.quantity });
     return NextResponse.json(result.rows[0]);
-  } catch (error: any) {
-    console.error('Update inventory error:', error);
-    return NextResponse.json({ error: 'Failed to update item' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
+  } catch (error: unknown) {
+    return apiErrorResponse(error, 'Failed to update item');
   } finally {
     client.release();
   }
@@ -110,10 +105,10 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   const client = await pool.connect();
   try {
-    const { farm_id, is_superadmin } = await getSessionInfo();
-    const body = await request.json();
-    const { id } = body;
-    if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
+    const session = await requirePermission('inventory:write');
+    const { farm_id, is_superadmin } = session;
+    const body = await readJson(request);
+    const id = idValue(body.id);
 
     const query = is_superadmin
         ? 'DELETE FROM inventory WHERE id = $1'
@@ -127,10 +122,10 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: 'Item not found or access denied' }, { status: 404 });
     }
     
+    await logAudit(session, 'inventory.deleted', 'inventory', id);
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Delete inventory error:', error);
-    return NextResponse.json({ error: 'Failed to delete item' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
+  } catch (error: unknown) {
+    return apiErrorResponse(error, 'Failed to delete item');
   } finally {
     client.release();
   }

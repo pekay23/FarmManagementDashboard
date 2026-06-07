@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Known issues · Hughes Farms</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<div class="he-shell he-shell--wide">
+
+<nav class="he-nav">
+  <a class="he-nav__brand" href="../index.html">Hughes Farms <small>docs</small></a>
+  <div class="he-nav__links">
+    <a href="../index.html">Index</a>
+    <a href="../architecture/system-overview.html">Architecture</a>
+    <a href="../design/01-foundations.html">Design</a>
+    <a href="../guides/setup.html">Guides</a>
+    <a href="../audits/known-issues.html">Audits</a>
+    <a href="../plans/future-plans.html">Plans</a>
+  </div>
+</nav>
+<div class="he-layout">
+<main class="he-main">
+<header>
+  <p class="he-eyebrow">Audits</p>
+  <h1 class="he-title">Known issues</h1>
+  <p class="he-deck">Persistent issues that aren&#39;t blockers but are worth knowing about.</p>
+</header>
+<p>The mobile-only top bar (<code>md:hidden</code>) and the brand-tile background
+still use <code>bg-emerald-900</code>, <code>border-white/10</code>, etc. — these were
+left as-is to keep the upgrade diff small. A future pass should
+swap them for <code>bg-sidebar-from</code> / <code>border-sidebar-border</code> for full
+dark-mode adaptation.</p>
+
+</main>
+
+<aside class="he-toc" aria-label="On this page">
+  <p class="he-toc__label">On this page</p>
+  <ul>
+    <li class="he-toc__l2"><a href="#eslint-10-eslint-plugin-react7375-compat-shim">ESLint 10 ↔ `eslint-plugin-react@7.37.5` compat shim</a></li>
+    <li class="he-toc__l2"><a href="#nextjs-16-deprecation-middlewarets-proxyts">Next.js 16 deprecation — `middleware.ts` → `proxy.ts</a></li>
+    <li class="he-toc__l2"><a href="#reactdisplay-name-rule-disabled">react/display-name` rule disabled</a></li>
+    <li class="he-toc__l2"><a href="#pre-existing-lint-warnings">Pre-existing lint warnings</a></li>
+    <li class="he-toc__l2"><a href="#pg-ssl-mode-warning-sslmoderequire">pg` SSL mode warning (`sslmode=require`)</a></li>
+    <li class="he-toc__l2"><a href="#401-unauthorized-errors-before-first-sign-in">401 Unauthorized` errors before first sign-in</a></li>
+    <li class="he-toc__l2"><a href="#missing-typespg">Missing `@types/pg</a></li>
+    <li class="he-toc__l2"><a href="#tailwindconfigts-removed">tailwind.config.ts` removed</a></li>
+    <li class="he-toc__l2"><a href="#sidebar-still-uses-some-hard-coded-emeraldteal-classes">Sidebar still uses some hard-coded emerald/teal classes</a></li>
+  </ul>
+</aside>
+</div>
+<footer class="he-foot">
+  Source · <a href="../../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+</footer>
+</div>
+</body>
+</html>

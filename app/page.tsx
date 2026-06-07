@@ -186,7 +186,7 @@ function DashboardContent() {
         )}
         {!isSuperAdmin && (
           <div className="hidden md:block bg-white px-4 py-2 rounded-lg border border-gray-100 shadow-sm text-sm font-medium text-gray-600">
-             Hughes Farms • Offline Ready ⚡
+             FieldOps - Offline Ready
           </div>
         )}
       </div>
@@ -394,3 +394,4 @@ function QuickAction({ href, title, color, icon: Icon }: any) {
         </Link>
     )
 }
+

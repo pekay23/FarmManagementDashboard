@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     else if (type === 'weights') table = 'livestock_weight_logs';
     else return NextResponse.json([]);
     
-    let values: any[] = [livestock_id];
+    const values: any[] = [livestock_id];
     
     // ✅ Super Admin can see any record. Clients are restricted.
     if (is_superadmin) {

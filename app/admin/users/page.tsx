@@ -1,21 +1,33 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
-import { 
-  Users, UserPlus, Trash2, Pencil, Shield, 
-  Lock, Mail, X, Loader2, Warehouse 
-} from 'lucide-react';
-import { useSession } from 'next-auth/react';
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { Loader2, Pencil, Shield, Trash2, UserPlus, Warehouse } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent } from "@/components/ui/Card";
+import { DialogShell } from "@/components/ui/Dialog";
+import { Field, inputClassName } from "@/components/ui/Field";
+
+type UserRow = {
+  id: number;
+  email: string;
+  created_at: string;
+  is_superadmin?: boolean;
+  role?: string;
+  farm_name?: string | null;
+};
 
 export default function UserManagement() {
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<any>(null);
-  
+  const [editingUser, setEditingUser] = useState<UserRow | null>(null);
+  const [deletingUser, setDeletingUser] = useState<UserRow | null>(null);
+  const [formError, setFormError] = useState("");
+
   const { data: session } = useSession();
-  const isSuperAdmin = (session?.user as any)?.is_superadmin;
+  const isSuperAdmin = Boolean((session?.user as { is_superadmin?: boolean } | undefined)?.is_superadmin);
 
   useEffect(() => {
     fetchUsers();
@@ -23,232 +35,308 @@ export default function UserManagement() {
 
   async function fetchUsers() {
     try {
-      const res = await fetch('/api/users');
+      const res = await fetch("/api/users", { cache: "no-store" });
       const data = await res.json();
       if (Array.isArray(data)) setUsers(data);
-    } catch (e) {
+    } catch {
       toast.error("Failed to load users");
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleSave(e: any) {
+  function openCreate() {
+    setFormError("");
+    setEditingUser(null);
+    setIsModalOpen(true);
+  }
+
+  function openEdit(user: UserRow) {
+    setFormError("");
+    setEditingUser(user);
+    setIsModalOpen(true);
+  }
+
+  async function handleSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const formData = {
-        email: e.target.email.value,
-        password: e.target.password.value,
-        farm_name: e.target.farm_name?.value, // ✅ Capture Farm Name for new users
+    setFormError("");
+
+    const formData = new FormData(e.currentTarget);
+    const payload = {
+      email: String(formData.get("email") || ""),
+      password: String(formData.get("password") || ""),
+      farm_name: String(formData.get("farm_name") || ""),
     };
 
-    try {
-        let res;
-        if (editingUser) {
-            // Update existing
-            res = await fetch('/api/users', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: editingUser.id, ...formData })
-            });
-        } else {
-            // Create new
-            res = await fetch('/api/users', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
-            });
-        }
+    if (!editingUser && payload.password.length < 12) {
+      setFormError("Use a password with at least 12 characters.");
+      return;
+    }
 
-        if (res.ok) {
-            toast.success(editingUser ? "Account updated" : "New Farm Owner & Farm created!");
-            setIsModalOpen(false);
-            setEditingUser(null);
-            fetchUsers(); 
-        } else {
-            const err = await res.json();
-            toast.error(err.error || "Operation failed");
-        }
-    } catch (error) {
-        toast.error("Network error");
+    if (editingUser && payload.password && payload.password.length < 12) {
+      setFormError("Use a password with at least 12 characters.");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/users", {
+        method: editingUser ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingUser ? { id: editingUser.id, password: payload.password } : payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const message = err.error || "Operation failed";
+        setFormError(message);
+        toast.error(message);
+        return;
+      }
+
+      toast.success(editingUser ? "Account updated" : "Farm owner created");
+      setIsModalOpen(false);
+      setEditingUser(null);
+      fetchUsers();
+    } catch {
+      setFormError("Network error");
+      toast.error("Network error");
     }
   }
 
-  async function handleDelete(id: number) {
-      if (!confirm("Delete this user? This cannot be undone.")) return;
-      try {
-          const res = await fetch('/api/users', {
-              method: 'DELETE',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id })
-          });
-          if (res.ok) {
-              toast.success("User deleted");
-              fetchUsers();
-          } else {
-              toast.error("Failed to delete user");
-          }
-      } catch (e) {
-          toast.error("Error deleting user");
+  async function handleDelete() {
+    if (!deletingUser) return;
+    try {
+      const res = await fetch("/api/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: deletingUser.id }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Failed to delete user");
+        return;
       }
+
+      toast.success("User deleted");
+      setDeletingUser(null);
+      fetchUsers();
+    } catch {
+      toast.error("Error deleting user");
+    }
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto min-h-screen">
-      
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+    <div className="mx-auto min-h-screen max-w-6xl p-4 pb-20 md:p-8">
+      <div className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Shield className="w-6 h-6 text-primary-600"/> 
+          <h1 className="flex items-center gap-2 text-2xl font-extrabold text-foreground">
+            <Shield className="h-6 w-6 text-primary" />
             {isSuperAdmin ? "Platform User Management" : "Account Management"}
           </h1>
-          <p className="text-gray-500">Manage farm owner accounts</p>
+          <p className="mt-1 text-sm text-muted-foreground">Manage farm owner accounts and access.</p>
         </div>
-        
-        {/* Only Super Admin can add new Farm Owners directly here */}
+
         {isSuperAdmin && (
-            <button 
-                onClick={() => { setEditingUser(null); setIsModalOpen(true); }} 
-                className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg flex items-center gap-2 font-bold shadow-md transition-colors"
-            >
-                <UserPlus className="w-5 h-5" /> Add Farm Owner
-            </button>
+          <Button onClick={openCreate} className="w-full md:w-auto">
+            <UserPlus className="h-5 w-5" />
+            Add Farm Owner
+          </Button>
         )}
       </div>
 
-      {/* Users Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <Card className="overflow-hidden">
         {loading ? (
-            <div className="p-12 flex justify-center text-gray-400"><Loader2 className="w-8 h-8 animate-spin" /></div>
+          <CardContent className="flex justify-center py-12 text-muted-foreground">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </CardContent>
+        ) : users.length === 0 ? (
+          <CardContent className="py-12 text-center">
+            <p className="text-sm font-medium text-muted-foreground">No users found.</p>
+          </CardContent>
         ) : (
-            <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 tracking-wider">
-                            <th className="p-4 font-semibold">User / Email</th>
-                            {isSuperAdmin && <th className="p-4 font-semibold">Farm Name</th>}
-                            <th className="p-4 font-semibold">Type</th>
-                            <th className="p-4 font-semibold">Joined</th>
-                            <th className="p-4 font-semibold text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                        {users.map((user) => (
-                            <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                                <td className="p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center text-primary-600 font-bold">
-                                            {user.email.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div className="font-medium text-gray-900">{user.email}</div>
-                                    </div>
-                                </td>
-                                
-                                {isSuperAdmin && (
-                                    <td className="p-4 text-sm text-gray-600 font-medium">
-                                        {user.farm_name || <span className="text-gray-400 italic">No Farm</span>}
-                                    </td>
-                                )}
-
-                                <td className="p-4">
-                                    <span className={`px-2 py-1 rounded-md text-xs font-bold ${
-                                        (user.role === 'Admin' || user.is_superadmin) ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'
-                                    }`}>
-                                        {(user.role === 'Admin' || user.is_superadmin) ? 'Platform Admin' : 'Farm Owner'}
-                                    </span>
-                                </td>
-                                <td className="p-4 text-gray-500 text-sm">
-                                    {new Date(user.created_at).toLocaleDateString()}
-                                </td>
-                                <td className="p-4 text-right flex justify-end gap-2">
-                                    <button 
-                                        onClick={() => { setEditingUser(user); setIsModalOpen(true); }} 
-                                        className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                                    >
-                                        <Pencil className="w-4 h-4" />
-                                    </button>
-                                    <button 
-                                        onClick={() => handleDelete(user.id)} 
-                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+          <>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-border bg-table-header text-xs uppercase text-muted-foreground">
+                    <th className="p-4 font-semibold">User / Email</th>
+                    {isSuperAdmin && <th className="p-4 font-semibold">Farm Name</th>}
+                    <th className="p-4 font-semibold">Type</th>
+                    <th className="p-4 font-semibold">Joined</th>
+                    <th className="p-4 text-right font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {users.map((user) => (
+                    <UserTableRow
+                      key={user.id}
+                      user={user}
+                      isSuperAdmin={isSuperAdmin}
+                      onEdit={() => openEdit(user)}
+                      onDelete={() => setDeletingUser(user)}
+                    />
+                  ))}
+                </tbody>
+              </table>
             </div>
+
+            <div className="divide-y divide-border md:hidden">
+              {users.map((user) => (
+                <UserMobileCard
+                  key={user.id}
+                  user={user}
+                  isSuperAdmin={isSuperAdmin}
+                  onEdit={() => openEdit(user)}
+                  onDelete={() => setDeletingUser(user)}
+                />
+              ))}
+            </div>
+          </>
         )}
-      </div>
+      </Card>
 
-      {/* Add/Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
-            <div className="bg-white rounded-xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-gray-900">{editingUser ? 'Edit Account' : 'Create Farm Owner'}</h2>
-                    <button onClick={() => setIsModalOpen(false)}><X className="text-gray-400 hover:text-gray-600" /></button>
+        <DialogShell title={editingUser ? "Edit Account" : "Create Farm Owner"} onClose={() => setIsModalOpen(false)}>
+          <form onSubmit={handleSave} className="space-y-5 p-5">
+            {!editingUser && (
+              <Field label="Email Address">
+                <input name="email" required type="email" className={inputClassName} placeholder="owner@farm.com" />
+              </Field>
+            )}
+
+            {isSuperAdmin && !editingUser && (
+              <Field label="Farm Name">
+                <div className="relative">
+                  <Warehouse className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <input name="farm_name" required className={`${inputClassName} pl-9`} placeholder="North Ridge Farm" />
                 </div>
-                
-                <form onSubmit={handleSave} className="space-y-4">
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase ml-1">Email Address</label>
-                        <div className="relative mt-1">
-                            <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                            <input 
-                                name="email" 
-                                type="email" 
-                                required 
-                                defaultValue={editingUser?.email}
-                                disabled={!!editingUser} 
-                                className="w-full pl-9 pr-4 py-2.5 border rounded-lg outline-none focus:border-primary-500 disabled:bg-gray-100 disabled:text-gray-500" 
-                                placeholder="client@farm.com"
-                            />
-                        </div>
-                    </div>
+              </Field>
+            )}
 
-                    {/* ✅ New Field: Farm Name (Only for new users) */}
-                    {!editingUser && (
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase ml-1">Farm Name</label>
-                            <div className="relative mt-1">
-                                <Warehouse className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                                <input 
-                                    name="farm_name" 
-                                    type="text" 
-                                    required 
-                                    className="w-full pl-9 pr-4 py-2.5 border rounded-lg outline-none focus:border-primary-500" 
-                                    placeholder="e.g. Sunrise Organics"
-                                />
-                            </div>
-                        </div>
-                    )}
+            <Field
+              label={editingUser ? "New Password" : "Temporary Password"}
+              help={editingUser ? "Leave blank to keep the current password." : "Minimum 12 characters."}
+              error={formError}
+            >
+              <input
+                name="password"
+                type="password"
+                required={!editingUser}
+                className={inputClassName}
+                placeholder="Minimum 12 characters"
+              />
+            </Field>
 
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase ml-1">
-                            {editingUser ? 'New Password (Optional)' : 'Password'}
-                        </label>
-                        <div className="relative mt-1">
-                            <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                            <input 
-                                name="password" 
-                                type="password" 
-                                required={!editingUser} 
-                                className="w-full pl-9 pr-4 py-2.5 border rounded-lg outline-none focus:border-primary-500" 
-                                placeholder="••••••••"
-                            />
-                        </div>
-                        {editingUser && <p className="text-xs text-gray-400 mt-1 ml-1">Leave blank to keep current password.</p>}
-                    </div>
-
-                    <button className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-lg font-bold shadow-md mt-2">
-                        {editingUser ? 'Update Account' : 'Create Account'}
-                    </button>
-                </form>
-            </div>
-        </div>
+            <Button type="submit" className="w-full">
+              {editingUser ? "Update Account" : "Create Farm Owner"}
+            </Button>
+          </form>
+        </DialogShell>
       )}
+
+      {deletingUser && (
+        <DialogShell title="Delete User" onClose={() => setDeletingUser(null)} className="max-w-sm">
+          <div className="space-y-5 p-5">
+            <p className="text-sm text-muted-foreground">
+              Delete <strong className="text-foreground">{deletingUser.email}</strong>? This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={() => setDeletingUser(null)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" className="flex-1" onClick={handleDelete}>
+                Delete
+              </Button>
+            </div>
+          </div>
+        </DialogShell>
+      )}
+    </div>
+  );
+}
+
+function UserTableRow({
+  user,
+  isSuperAdmin,
+  onEdit,
+  onDelete,
+}: {
+  user: UserRow;
+  isSuperAdmin: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const isPlatformAdmin = user.role === "Admin" || user.is_superadmin;
+  return (
+    <tr className="transition-colors hover:bg-table-row-hover">
+      <td className="p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-black text-primary">
+            {user.email.charAt(0).toUpperCase()}
+          </div>
+          <div className="font-medium text-foreground">{user.email}</div>
+        </div>
+      </td>
+      {isSuperAdmin && (
+        <td className="p-4 text-sm font-medium text-muted-foreground">
+          {user.farm_name || <span className="italic">No Farm</span>}
+        </td>
+      )}
+      <td className="p-4">
+        <span className={`rounded-md px-2 py-1 text-xs font-bold ${isPlatformAdmin ? 'bg-primary/10 text-primary' : 'bg-success-soft text-success-fg'}`}>
+          {isPlatformAdmin ? "Platform Admin" : "Farm Owner"}
+        </span>
+      </td>
+      <td className="p-4 text-sm text-muted-foreground">{new Date(user.created_at).toLocaleDateString()}</td>
+      <td className="p-4">
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="icon" onClick={onEdit} aria-label={`Edit ${user.email}`}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={onDelete} aria-label={`Delete ${user.email}`}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function UserMobileCard({
+  user,
+  isSuperAdmin,
+  onEdit,
+  onDelete,
+}: {
+  user: UserRow;
+  isSuperAdmin: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const isPlatformAdmin = user.role === "Admin" || user.is_superadmin;
+  return (
+    <div className="space-y-3 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-foreground">{user.email}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{new Date(user.created_at).toLocaleDateString()}</p>
+        </div>
+        <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-bold ${isPlatformAdmin ? 'bg-primary/10 text-primary' : 'bg-success-soft text-success-fg'}`}>
+          {isPlatformAdmin ? "Admin" : "Owner"}
+        </span>
+      </div>
+      {isSuperAdmin && <p className="text-xs text-muted-foreground">{user.farm_name || "No Farm"}</p>}
+      <div className="flex gap-2">
+        <Button variant="secondary" size="sm" className="flex-1" onClick={onEdit}>
+          <Pencil className="h-3.5 w-3.5" />
+          Edit
+        </Button>
+        <Button variant="secondary" size="sm" className="flex-1" onClick={onDelete}>
+          <Trash2 className="h-3.5 w-3.5" />
+          Delete
+        </Button>
+      </div>
     </div>
   );
 }

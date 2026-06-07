@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>03 · Typography · Hughes Farms</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<div class="he-shell he-shell--wide">
+
+<nav class="he-nav">
+  <a class="he-nav__brand" href="../index.html">Hughes Farms <small>docs</small></a>
+  <div class="he-nav__links">
+    <a href="../index.html">Index</a>
+    <a href="../architecture/system-overview.html">Architecture</a>
+    <a href="../design/01-foundations.html">Design</a>
+    <a href="../guides/setup.html">Guides</a>
+    <a href="../audits/known-issues.html">Audits</a>
+    <a href="../plans/future-plans.html">Plans</a>
+  </div>
+</nav>
+<div class="he-layout">
+<main class="he-main">
+<header>
+  <p class="he-eyebrow">Design</p>
+  <h1 class="he-title">03 · Typography</h1>
+  <p class="he-deck">The whole app uses <strong>Inter</strong> as its single typeface.</p>
+</header>
+<p>So if Inter ever fails to load (e.g. a serverless build with no
+network), the platform sans-serif takes over instead of the user
+seeing Times New Roman.</p>
+
+</main>
+
+<aside class="he-toc" aria-label="On this page">
+  <p class="he-toc__label">On this page</p>
+  <ul>
+    <li class="he-toc__l2"><a href="#font-load">Font load</a></li>
+    <li class="he-toc__l2"><a href="#scale">Scale</a></li>
+    <li class="he-toc__l2"><a href="#usage-conventions">Usage conventions</a></li>
+    <li class="he-toc__l2"><a href="#font-family-fallback">Font-family fallback</a></li>
+  </ul>
+</aside>
+</div>
+<footer class="he-foot">
+  Source · <a href="../../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+</footer>
+</div>
+</body>
+</html>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import pool from '@/lib/pg'; 
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { logAudit, requirePermission } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,7 @@ export async function GET() {
     const { farm_id, is_superadmin } = await getSessionInfo();
 
     let query = 'SELECT * FROM livestock';
-    let values: any[] = [];
+    const values: any[] = [];
     
     if (!is_superadmin) {
         query += ' WHERE farm_id = $1';
@@ -44,7 +45,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const client = await pool.connect(); // Keep client for transaction
   try {
-    const { farm_id } = await getSessionInfo();
+    const session = await requirePermission('livestock:write');
+    const { farm_id } = session;
     if (!farm_id) throw new Error('Unauthorized'); 
 
     const body = await request.json();
@@ -60,6 +62,7 @@ export async function POST(request: Request) {
       date_of_birth, current_weight_kg, health_status || 'Healthy'
     ];
     const result = await client.query(query, values);
+    await logAudit(session, 'livestock.created', 'livestock', result.rows[0].id, { animal_id, species });
     
     return NextResponse.json(result.rows[0]);
   } catch (error: any) {
@@ -72,12 +75,13 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const client = await pool.connect();
   try {
-    const { farm_id, is_superadmin } = await getSessionInfo();
+    const session = await requirePermission('livestock:write');
+    const { farm_id, is_superadmin } = session;
     const body = await request.json();
     const { id, animal_id, species, breed, sex, date_of_birth, current_weight_kg, health_status } = body;
 
     let whereClause = "WHERE id = $8";
-    let values = [
+    const values = [
         animal_id, species, breed, sex, date_of_birth, 
         current_weight_kg, health_status, id
     ];
@@ -112,6 +116,7 @@ export async function PUT(request: Request) {
       updated_at: updatedAnimal.updated_at ? new Date(updatedAnimal.updated_at).toISOString() : null,
     };
 
+    await logAudit(session, 'livestock.updated', 'livestock', id, { animal_id, species, health_status });
     return NextResponse.json(serializableAnimal);
   } catch (error: any) {
     return NextResponse.json({ error: 'Failed to update animal' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
@@ -123,13 +128,14 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
     const client = await pool.connect();
     try {
-        const { farm_id, is_superadmin } = await getSessionInfo();
+        const session = await requirePermission('livestock:write');
+        const { farm_id, is_superadmin } = session;
         const { id } = await request.json();
         
         if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
         let query = 'DELETE FROM livestock WHERE id = $1';
-        let values = [id];
+        const values = [id];
 
         if (!is_superadmin) {
             if (!farm_id) throw new Error('Unauthorized');
@@ -143,6 +149,7 @@ export async function DELETE(request: Request) {
              return NextResponse.json({ error: 'Animal not found' }, { status: 404 });
         }
 
+        await logAudit(session, 'livestock.deleted', 'livestock', id);
         return NextResponse.json({ success: true });
     } catch (error: any) {
         return NextResponse.json({ error: 'Failed to delete livestock' }, { status: error.message === 'Unauthorized' ? 401 : 500 });

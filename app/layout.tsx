@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
 import Providers from "@/components/Providers";
-import { SyncProvider } from "@/context/SyncContext"; // Import from context, not components
+import AppShell from "@/components/AppShell";
+import { SyncProvider } from "@/context/SyncContext";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Hughes Farms",
-  description: "Farm Management Dashboard",
+  title: "FieldOps",
+  description: "Farm operations workspace",
   manifest: '/site.webmanifest',
   icons: {
     icon: [
@@ -29,17 +29,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} bg-gray-50 text-gray-900`}>
+    // `suppressHydrationWarning` is required by next-themes — the
+    // script it injects to set the theme class runs before React
+    // hydrates and would otherwise produce a warning.
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${inter.variable} ${inter.className} bg-background text-foreground`}>
         <Providers>
-            {/* Wrap the application in the SyncProvider */}
-            <SyncProvider>
-                <Toaster position="top-right" richColors />
-                <Sidebar />
-                <main className="md:ml-64 pt-16 md:pt-0 min-h-screen transition-all duration-300">
-                  {children}
-                </main>
-            </SyncProvider>
+          <SyncProvider>
+            <Toaster position="top-right" richColors />
+            <AppShell>{children}</AppShell>
+          </SyncProvider>
         </Providers>
       </body>
     </html>

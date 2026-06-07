@@ -3,17 +3,18 @@ import pool from '@/lib/pg';
 import bcrypt from 'bcryptjs';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { ApiError, apiErrorResponse, emailValue, idValue, readJson, text } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
 // --- SECURITY HELPER ---
 async function getSessionInfo() {
   const session = await getServerSession(authOptions);
-  if (!session) throw new Error('Forbidden');
+  if (!session) throw new ApiError('Forbidden', 403);
   
   const user = session.user as any;
   if (user.role !== 'Admin' && !user.is_superadmin) {
-      throw new Error('Forbidden');
+      throw new ApiError('Forbidden', 403);
   }
   return {
       farm_id: user.farm_id,
@@ -40,9 +41,8 @@ export async function GET() {
     
     const result = await pool.query(query, params);
     return NextResponse.json(result.rows);
-  } catch (error: any) {
-    console.error("GET Users Error:", error); // This will show up in your terminal
-    return NextResponse.json({ error: error.message }, { status: error.message === 'Forbidden' ? 403 : 500 });
+  } catch (error: unknown) {
+    return apiErrorResponse(error, 'Failed to fetch users');
   }
 }
 
@@ -53,11 +53,13 @@ export async function POST(request: Request) {
   const client = await pool.connect();
   try {
     const { farm_id, is_superadmin } = await getSessionInfo();
-    const body = await request.json();
-    const { email, password, farm_name } = body;
+    const body = await readJson(request);
+    const email = emailValue(body.email);
+    const password = text(body.password, 'password', { max: 200 });
+    const farm_name = text(body.farm_name, 'farm_name', { required: false, max: 160 });
 
-    if (!email || !password) {
-      return NextResponse.json({ error: 'Missing credentials' }, { status: 400 });
+    if (password.length < 12) {
+      return NextResponse.json({ error: 'Password must be at least 12 characters' }, { status: 400 });
     }
 
     await client.query('BEGIN');
@@ -97,10 +99,9 @@ export async function POST(request: Request) {
 
     await client.query('COMMIT');
     return NextResponse.json(result.rows[0]);
-  } catch (error: any) {
+  } catch (error: unknown) {
     await client.query('ROLLBACK');
-    console.error("API Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return apiErrorResponse(error, 'Failed to create user');
   } finally {
     client.release();
   }
@@ -110,10 +111,9 @@ export async function PUT(request: Request) {
   const client = await pool.connect();
   try {
     const { farm_id, is_superadmin } = await getSessionInfo();
-    const body = await request.json();
-    const { id, password } = body;
-
-    if (!id) return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    const body = await readJson(request);
+    const id = idValue(body.id, 'user_id');
+    const password = text(body.password, 'password', { required: false, max: 200 });
 
     let query;
     let values;
@@ -121,6 +121,9 @@ export async function PUT(request: Request) {
     const whereClause = is_superadmin ? "WHERE id = $2" : "WHERE id = $2 AND farm_id = $3";
     
     if (password) {
+      if (password.length < 12) {
+        return NextResponse.json({ error: 'Password must be at least 12 characters' }, { status: 400 });
+      }
       const hashedPassword = await bcrypt.hash(password, 10);
       query = `UPDATE users SET password = $1 ${whereClause} RETURNING id, email`;
       values = [hashedPassword, id];
@@ -136,8 +139,8 @@ export async function PUT(request: Request) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
     return NextResponse.json(result.rows[0]);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return apiErrorResponse(error, 'Failed to update user');
   } finally {
     client.release();
   }
@@ -148,14 +151,15 @@ export async function DELETE(request: Request) {
   const client = await pool.connect();
   try {
     const { farm_id, is_superadmin, user_id } = await getSessionInfo();
-    const { id } = await request.json();
+    const body = await readJson(request);
+    const id = idValue(body.id, 'user_id');
 
     if (id === user_id) {
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 });
     }
 
     const query = is_superadmin 
-      ? 'DELETE FROM users WHERE id = $1' 
+      ? 'DELETE FROM users WHERE id = $1 AND is_superadmin = FALSE' 
       : 'DELETE FROM users WHERE id = $1 AND farm_id = $2';
     
     const params = is_superadmin ? [id] : [id, farm_id];
@@ -165,8 +169,8 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return apiErrorResponse(error, 'Failed to delete user');
   } finally {
     client.release();
   }

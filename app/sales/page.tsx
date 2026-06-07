@@ -38,7 +38,7 @@ export default function SalesReceipts() {
   const [viewingReceipt, setViewingReceipt] = useState<any>(null);
   
   const [settings, setSettings] = useState<any>({ 
-      farm_name: 'Hughes Farms', 
+      farm_name: 'FieldOps Farm', 
       phone: '', email: '', address: '', receipt_footer: 'Thank you!', tax_rate: 0 
   });
 
@@ -199,7 +199,7 @@ export default function SalesReceipts() {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
-    doc.text(settings.farm_name?.toUpperCase() || "HUGHES FARMS", 55, 25);
+    doc.text(settings.farm_name?.toUpperCase() || "FIELDOPS FARM", 55, 25);
     
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
@@ -246,7 +246,7 @@ export default function SalesReceipts() {
     });
 
     // Totals
-    let finalY = (doc as any).lastAutoTable.finalY + 10;
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);

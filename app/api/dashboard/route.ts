@@ -69,8 +69,8 @@ export async function GET(request: Request) {
       pool.query(`SELECT 'task' as type, title, created_at as date, status FROM tasks WHERE status = 'Completed' AND ${where} ORDER BY created_at DESC LIMIT 5`, params)
     ]);
 
-    const recentSales = recentSalesRes.rows.map(s => ({ type: 'sale', title: `Sale: ${s.customer || 'Unknown'}`, date: s.date, detail: `GH₵ ${s.amount}` }));
-    const recentTasks = recentTasksRes.rows.map(t => ({ type: 'task', title: `Task: ${t.title}`, date: t.date, detail: t.status }));
+    const recentSales = recentSalesRes.rows.map((s: any) => ({ type: 'sale', title: `Sale: ${s.customer || 'Unknown'}`, date: s.date, detail: `GH₵ ${s.amount}` }));
+    const recentTasks = recentTasksRes.rows.map((t: any) => ({ type: 'task', title: `Task: ${t.title}`, date: t.date, detail: t.status }));
     const activityFeed = [...recentSales, ...recentTasks].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
 
     return NextResponse.json({

@@ -1,18 +1,8 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/pg';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { ApiError, apiErrorResponse, getSessionInfo, idValue, logAudit, numberValue, readJson, requirePermission, text } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
-
-async function getSessionInfo() {
-  const session = await getServerSession(authOptions);
-  if (!session) throw new Error('Unauthorized');
-  return {
-    farm_id: (session.user as any).farm_id,
-    is_superadmin: (session.user as any).is_superadmin
-  };
-}
 
 export async function GET() {
   // ✅ OPTIMIZED
@@ -47,25 +37,38 @@ export async function GET() {
 
     const result = await pool.query(query, params);
     return NextResponse.json(result.rows);
-  } catch (error: any) {
-    console.error('Fetch sales error:', error);
-    return NextResponse.json({ error: 'Failed to fetch sales' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
+  } catch (error: unknown) {
+    return apiErrorResponse(error, 'Failed to fetch sales');
   }
 }
 
+function normalizeSaleItems(items: unknown) {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new ApiError('At least one sale item is required', 400);
+  }
+
+  return items.map((item, index) => {
+    const row = item as Record<string, unknown>;
+    const name = text(row.item_name ?? row.name, `items[${index}].name`, { max: 160 });
+    const qty = numberValue(row.quantity ?? row.qty, `items[${index}].quantity`, { min: 0.0001 });
+    const price = numberValue(row.price_at_sale ?? row.price, `items[${index}].price`, { min: 0 });
+    return { name, qty, price };
+  });
+}
 
 export async function POST(request: Request) {
   const client = await pool.connect();
   try {
-    const { farm_id } = await getSessionInfo();
-    if (!farm_id) throw new Error('Unauthorized'); // Strict: Only farm owners can create
+    const session = await requirePermission('sales:write');
+    if (!session.farm_id) throw new ApiError('Farm workspace required', 403);
+    const { farm_id } = session;
 
-    const body = await request.json();
-    const buyerName = body.buyer_name || body.customer;
-    const totalAmount = body.total_amount || body.amount;
-    const contactInfo = body.contact_info;
-    const items = body.items || body.itemsData || [];
-    const deductInventory = body.deduct_inventory;
+    const body = await readJson(request);
+    const buyerName = text(body.buyer_name ?? body.customer, 'buyer_name', { max: 160 });
+    const contactInfo = text(body.contact_info, 'contact_info', { required: false, max: 120 });
+    const items = normalizeSaleItems(body.items ?? body.itemsData);
+    const deductInventory = Boolean(body.deduct_inventory);
+    const totalAmount = items.reduce((sum, item) => sum + item.qty * item.price, 0);
 
     await client.query('BEGIN');
 
@@ -80,25 +83,27 @@ export async function POST(request: Request) {
 
     // 2. Insert Items
     for (const item of items) {
-      const name = item.item_name || item.name;
-      const qty = item.quantity || item.qty;
-      const price = item.price_at_sale || item.price;
-
       await client.query(
         'INSERT INTO sale_items (farm_id, sale_id, item_name, quantity, price_at_sale) VALUES ($1, $2, $3, $4, $5)', 
-        [farm_id, newSale.id, name, qty, price]
+        [farm_id, newSale.id, item.name, item.qty, item.price]
       );
 
-      // 3. Deduct Inventory
       if (deductInventory) {
-        await client.query(
-          'UPDATE inventory SET quantity = quantity - $1, last_updated = CURRENT_TIMESTAMP WHERE item_name = $2 AND farm_id = $3',
-          [qty, name, farm_id]
+        const inventoryUpdate = await client.query(
+          `UPDATE inventory
+           SET quantity = quantity - $1, last_updated = CURRENT_TIMESTAMP
+           WHERE item_name = $2 AND farm_id = $3 AND quantity >= $1
+           RETURNING id`,
+          [item.qty, item.name, farm_id]
         );
+        if (inventoryUpdate.rowCount === 0) {
+          throw new ApiError(`Insufficient stock for ${item.name}`, 409);
+        }
       }
     }
 
     await client.query('COMMIT');
+    await logAudit(session, 'sale.created', 'sale', newSale.id, { buyer_name: buyerName, total_amount: totalAmount });
 
     return NextResponse.json({
         id: newSale.id,
@@ -110,10 +115,9 @@ export async function POST(request: Request) {
         created_at: newSale.sale_date 
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     await client.query('ROLLBACK');
-    console.error('Record sale error:', error);
-    return NextResponse.json({ error: 'Failed to record sale' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
+    return apiErrorResponse(error, 'Failed to record sale');
   } finally {
     client.release();
   }
@@ -122,16 +126,16 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const client = await pool.connect();
   try {
-    const { farm_id, is_superadmin } = await getSessionInfo();
-    const { id } = await request.json();
-
-    if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
+    const session = await requirePermission('sales:write');
+    const { farm_id, is_superadmin } = session;
+    const body = await readJson(request);
+    const id = idValue(body.id);
 
     await client.query('BEGIN');
     
     // ✅ Logic: Super Admin can delete ANY sale. Client restricted by farm_id.
     let checkQuery = 'SELECT id FROM sales WHERE id = $1';
-    let checkParams = [id];
+    const checkParams: Array<string | number> = [id];
 
     if (!is_superadmin) {
         if (!farm_id) throw new Error('Unauthorized');
@@ -152,11 +156,11 @@ export async function DELETE(request: Request) {
     await client.query('DELETE FROM sales WHERE id = $1', [id]);
     
     await client.query('COMMIT');
+    await logAudit(session, 'sale.deleted', 'sale', id);
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     await client.query('ROLLBACK');
-    console.error('Delete sale error:', error);
-    return NextResponse.json({ error: 'Failed to delete sale' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
+    return apiErrorResponse(error, 'Failed to delete sale');
   } finally {
     client.release();
   }

@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils"; // Assuming you have a clsx/tailwind-merge utility, otherwise remove 'cn'
+import { cn } from "@/lib/utils";
 
 export function Skeleton({
   className,
@@ -6,7 +6,7 @@ export function Skeleton({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={`animate-pulse rounded-md bg-gray-200/80 ${className}`}
+      className={cn("animate-pulse rounded-md bg-gray-200/80", className)}
       {...props}
     />
   );

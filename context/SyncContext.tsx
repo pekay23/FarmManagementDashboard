@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 import { db, FarmDatabase } from '@/lib/db';
 import { toast } from 'sonner';
 
@@ -19,9 +20,13 @@ const SyncContext = createContext<SyncContextType>({
 export const useSync = () => useContext(SyncContext);
 
 export function SyncProvider({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
   const [isOnline, setIsOnline] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const isSyncingRef = useRef(false);
   const hasPulledData = useRef(false);
+  const isSuperAdmin = (session?.user as { is_superadmin?: boolean } | undefined)?.is_superadmin;
+  const canSync = status === 'authenticated' && !isSuperAdmin;
 
   // --- MAPPER HELPERS ---
   const mapLocalTaskToServer = async (t: any) => {
@@ -76,7 +81,35 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         case 'expenses': return { ...base, title: s.title, category: s.category, amount: Number(s.amount), date: s.expense_date, notes: s.notes };
         case 'livestock': return { ...base, animal_id: s.animal_id, species: s.species, breed: s.breed, sex: s.sex, date_of_birth: s.date_of_birth, current_weight_kg: Number(s.current_weight_kg), health_status: s.health_status };
         case 'treatments': return { ...base, crop_id: s.crop_id, treatment_type: s.treatment_type, product_name: s.product_name, treatment_date: s.treatment_date, quantity: s.quantity, cost: Number(s.cost), notes: s.notes };
+        case 'scouting': return { ...base, crop_id: s.crop_id, field_name: s.field_name, scout_date: s.scout_date, crop_stage: s.crop_stage, issue_type: s.issue_type, severity: s.severity, latitude: Number(s.latitude || 0), longitude: Number(s.longitude || 0), notes: s.notes, recommendation: s.recommendation, status: s.status };
+        case 'attachments': return { ...base, entity_type: s.entity_type, entity_id: s.entity_id, file_name: s.file_name, file_type: s.file_type, file_size: Number(s.file_size || 0), url: s.url, data_url: s.data_url, notes: s.notes };
         default: return base;
+    }
+  }
+
+  async function recordConflict(tableName: string, recordId: string, localData: any, serverData: any, reason: string) {
+    const conflict = {
+      id: `${tableName}:${recordId}:${Date.now()}`,
+      table_name: tableName,
+      record_id: String(recordId),
+      local_data: localData,
+      server_data: serverData,
+      reason,
+      status: 'open' as const,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await db.sync_conflicts.put(conflict);
+
+    try {
+      await fetch('/api/sync/conflicts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(conflict),
+      });
+    } catch {
+      // Local conflict storage is the source of truth while offline.
     }
   }
 
@@ -91,6 +124,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       { table: dbTyped.expenses, endpoint: '/api/expenses', mapper: (i: any) => ({ ...i, expense_date: i.date }) },
       { table: dbTyped.livestock, endpoint: '/api/livestock', mapper: (i: any) => ({ ...i }) },
       { table: dbTyped.treatments, endpoint: '/api/treatments', mapper: (i: any) => ({ ...i }) },
+      { table: dbTyped.scouting, endpoint: '/api/scouting', mapper: (i: any) => ({ ...i }) },
+      { table: dbTyped.attachments, endpoint: '/api/attachments', mapper: (i: any) => ({ ...i }) },
     ];
 
     for (const { table, endpoint, mapper } of simpleMappers) {
@@ -125,6 +160,14 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
           });
+
+          if (res.status === 409 || res.status === 412) {
+            let serverData = null;
+            try { serverData = await res.json(); } catch {}
+            await recordConflict(table.name, item.id, item, serverData, `Server rejected ${method} with ${res.status}`);
+            await table.update(item.id, { syncStatus: 'updated' });
+            return;
+          }
 
           if (res.ok) {
             if (isDeleted) {
@@ -164,6 +207,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       { url: '/api/expenses', table: dbTyped.expenses },
       { url: '/api/livestock', table: dbTyped.livestock },
       { url: '/api/treatments?crop_id=ALL', table: dbTyped.treatments },
+      { url: '/api/scouting', table: dbTyped.scouting },
+      { url: '/api/attachments', table: dbTyped.attachments },
     ];
 
     for (const { url, table } of endpoints) {
@@ -181,6 +226,14 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           for (const sItem of serverItems) {
             const localItem = mapServerToLocal(sItem, table.name);
             const existing = await table.get(localItem.id);
+            if (existing && existing.syncStatus !== 'synced') {
+               const serverUpdated = new Date(localItem.updatedAt || localItem.createdAt || 0).getTime();
+               const localUpdated = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
+               if (serverUpdated && localUpdated && serverUpdated > localUpdated) {
+                  await recordConflict(table.name, localItem.id, existing, localItem, 'Server changed while this record had local edits');
+               }
+               continue;
+            }
             // Overwrite if synced or missing
             if (!existing || existing.syncStatus === 'synced') {
                await table.put(localItem);
@@ -206,37 +259,66 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
   // --- 3. MAIN LOOP ---
   const syncNow = useCallback(async () => {
+    if (!canSync) return;
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      setIsOnline(false); return;
+      setIsOnline(false);
+      return;
     }
-    if (isSyncing) return;
-    
+    if (isSyncingRef.current) return;
+
+    isSyncingRef.current = true;
     setIsSyncing(true);
-    
-    try { await pushDataToServer(); } catch (e) { console.error("Push Failed", e); }
-    try { await pullDataFromServer(); } catch (e) { console.error("Pull Failed", e); }
-    
-    console.log("✅ Sync Cycle Complete");
-    setIsSyncing(false);
-  }, [isSyncing]);
+
+    try {
+      try { await pushDataToServer(); } catch (e) { console.error("Push Failed", e); }
+      try { await pullDataFromServer(); } catch (e) { console.error("Pull Failed", e); }
+      try {
+        const openConflicts = await db.sync_conflicts.where('status').equals('open').count();
+        if (openConflicts > 0) toast.warning(`${openConflicts} sync conflict${openConflicts === 1 ? '' : 's'} need review`);
+      } catch {}
+      console.log("Sync cycle complete");
+    } finally {
+      isSyncingRef.current = false;
+      setIsSyncing(false);
+    }
+  }, [canSync]);
 
   useEffect(() => {
-    setIsOnline(typeof navigator !== 'undefined' ? navigator.onLine : true);
+    queueMicrotask(() => {
+      setIsOnline(typeof navigator !== 'undefined' ? navigator.onLine : true);
+    });
+    const handleOffline = () => setIsOnline(false);
+    const handleOnlineStatus = () => setIsOnline(true);
+
+    window.addEventListener('online', handleOnlineStatus);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnlineStatus);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!canSync) {
+      hasPulledData.current = false;
+      isSyncingRef.current = false;
+      if (isSyncing) setIsSyncing(false);
+      return;
+    }
+
     if (!hasPulledData.current) { syncNow(); hasPulledData.current = true; }
 
     const interval = setInterval(syncNow, 15000);
     const handleOnline = () => { setIsOnline(true); syncNow(); toast.success("Online: Syncing data..."); };
-    const handleOffline = () => setIsOnline(false);
 
     window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
     };
-  }, [syncNow]);
+  }, [canSync, isSyncing, syncNow]);
 
   return (
     <SyncContext.Provider value={{ isOnline, isSyncing, syncNow }}>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LLM Council framework · Hughes Farms</title>
+<link rel="stylesheet" href="./docs.css">
+</head>
+<body>
+<div class="he-shell he-shell--wide">
+
+<nav class="he-nav">
+  <a class="he-nav__brand" href="./index.html">Hughes Farms <small>docs</small></a>
+  <div class="he-nav__links">
+    <a href="./index.html">Index</a>
+    <a href="./architecture/system-overview.html">Architecture</a>
+    <a href="./design/01-foundations.html">Design</a>
+    <a href="./guides/setup.html">Guides</a>
+    <a href="./audits/known-issues.html">Audits</a>
+    <a href="./plans/future-plans.html">Plans</a>
+  </div>
+</nav>
+<div class="he-layout">
+<main class="he-main">
+<header>
+  <p class="he-eyebrow">Hughes Farms</p>
+  <h1 class="he-title">LLM Council framework</h1>
+  <p class="he-deck">The <strong>LLM Council</strong> is an advanced AI evaluation framework used by engineering and design teams to ensure robust, unbiased, and high-quality outcomes when reviewing code, architecture, or UX flows.</p>
+</header>
+<section class="he-section" id="what-is-it">
+  <div class="he-section__num">01 · What is it?</div>
+  <h2 class="he-section__title">What is it?</h2><p>Instead of relying on a single AI&#39;s output—which can be subject to bias, hallucinations, or &quot;sycophancy&quot;—the LLM Council framework simulates a &quot;debate&quot; among multiple distinct AI personas.</p>
+<p>These personas act as independent domain experts. They critique a given problem, review each other&#39;s opinions, and ultimately synthesize their findings into a balanced, comprehensive action plan.</p>
+<section class="he-section" id="the-personas">
+  <div class="he-section__num">02 · The Personas</div>
+  <h2 class="he-section__title">The Personas</h2><p>A typical LLM Council consists of:</p>
+<ol>
+<li><strong>The Performance Guru:</strong> Scrutinizes load times, rendering strategies, memory leaks, and Web Vitals.</li>
+<li><strong>The Accessibility Advocate:</strong> Ensures WCAG compliance, semantic HTML, ARIA standards, and screen-reader testing.</li>
+<li><strong>The Security Auditor:</strong> Hunts for vulnerabilities, ensures secure data handling, and validates rate limits or CORS boundaries.</li>
+<li><strong>The UX/UI Designer:</strong> Evaluates user journeys, micro-interactions, responsive behavior, and overall aesthetic consistency.</li>
+<li><strong>The Chairman:</strong> Synthesizes the individual critiques, resolves conflicting recommendations, and proposes the final action plan.</li>
+</ol>
+<section class="he-section" id="the-3-stage-process">
+  <div class="he-section__num">03 · The 3-Stage Process</div>
+  <h2 class="he-section__title">The 3-Stage Process</h2><ol>
+<li><strong>First Opinions (Divergence):</strong> Each expert independently evaluates the codebase or feature without seeing the others&#39; thoughts.</li>
+<li><strong>Peer Review (Evaluation):</strong> The experts cross-examine each other&#39;s findings. For example, the UX Designer&#39;s heavy animation might be challenged by the Performance Guru.</li>
+<li><strong>Synthesis (Convergence):</strong> The Chairman aggregates the valid points into a final, actionable summary.</li>
+</ol>
+<section class="he-section" id="usage-in-this-codebase">
+  <div class="he-section__num">04 · Usage in this Codebase</div>
+  <h2 class="he-section__title">Usage in this Codebase</h2><p>When using AI agents (like Claude Code, Antigravity, or others) to review significant pull requests, architecture decisions, or general audits, prompt them to:</p>
+<blockquote>
+<p><em>&quot;Use the LLM Council framework to evaluate this feature/code.&quot;</em></p>
+</blockquote>
+<p>The agents will automatically adopt these personas, deliberate the pros and cons, and return a highly vetted result.</p>
+
+</main>
+
+<aside class="he-toc" aria-label="On this page">
+  <p class="he-toc__label">On this page</p>
+  <ul>
+    <li class="he-toc__l2"><a href="#what-is-it">What is it?</a></li>
+    <li class="he-toc__l2"><a href="#the-personas">The Personas</a></li>
+    <li class="he-toc__l2"><a href="#the-3-stage-process">The 3-Stage Process</a></li>
+    <li class="he-toc__l2"><a href="#usage-in-this-codebase">Usage in this Codebase</a></li>
+  </ul>
+</aside>
+</div>
+<footer class="he-foot">
+  Source · <a href="./../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+</footer>
+</div>
+</body>
+</html>

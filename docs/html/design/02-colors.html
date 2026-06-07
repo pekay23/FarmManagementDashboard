@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>02 · Color tokens · Hughes Farms</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<div class="he-shell he-shell--wide">
+
+<nav class="he-nav">
+  <a class="he-nav__brand" href="../index.html">Hughes Farms <small>docs</small></a>
+  <div class="he-nav__links">
+    <a href="../index.html">Index</a>
+    <a href="../architecture/system-overview.html">Architecture</a>
+    <a href="../design/01-foundations.html">Design</a>
+    <a href="../guides/setup.html">Guides</a>
+    <a href="../audits/known-issues.html">Audits</a>
+    <a href="../plans/future-plans.html">Plans</a>
+  </div>
+</nav>
+<div class="he-layout">
+<main class="he-main">
+<header>
+  <p class="he-eyebrow">Design</p>
+  <h1 class="he-title">02 · Color tokens</h1>
+  <p class="he-deck">The palette is split into <strong>three layers</strong>, all defined as CSS variables in <code>app/globals.css</code> and exposed to Tailwind via the <code>@theme inline</code> block (so JSX keeps using utilities like <code>bg-primary</code> / <code>text-foreground</code> / <code>border-border</code>).</p>
+</header>
+<p><code>@theme inline</code> is Tailwind 4&#39;s &quot;expose this CSS variable as a utility&quot;
+syntax — <code>--color-X</code> becomes <code>bg-X</code>, <code>text-X</code>, <code>border-X</code>, <code>ring-X</code>,
+etc. The <code>inline</code> keyword tells Tailwind to keep the values as <code>var(…)</code>
+references instead of inlining the literal, so dark-mode switches
+automatically when the <code>.dark</code> class lands on <code><html></code>.</p>
+
+</main>
+
+<aside class="he-toc" aria-label="On this page">
+  <p class="he-toc__label">On this page</p>
+  <ul>
+    <li class="he-toc__l2"><a href="#21-brand-scale-teal">2.1 · Brand scale (teal)</a></li>
+    <li class="he-toc__l3"><a href="#backwards-compat-aliases">Backwards-compat aliases</a></li>
+    <li class="he-toc__l2"><a href="#22-semantic-tokens">2.2 · Semantic tokens</a></li>
+    <li class="he-toc__l2"><a href="#23-sidebar-tokens">2.3 · Sidebar tokens</a></li>
+    <li class="he-toc__l2"><a href="#24-chart-kpi-palette">2.4 · Chart / KPI palette</a></li>
+    <li class="he-toc__l2"><a href="#25-status-trio-success-warning-info">2.5 · Status trio (success / warning / info)</a></li>
+    <li class="he-toc__l2"><a href="#26-where-the-tokens-come-from">2.6 · Where the tokens come from</a></li>
+  </ul>
+</aside>
+</div>
+<footer class="he-foot">
+  Source · <a href="../../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+</footer>
+</div>
+</body>
+</html>

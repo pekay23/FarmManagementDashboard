@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import pool from '@/lib/pg'; 
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { logAudit, requirePermission } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ export async function GET() {
     const { farm_id, is_superadmin } = await getSessionInfo();
 
     let query = 'SELECT * FROM crops';
-    let values: any[] = [];
+    const values: any[] = [];
 
     if (!is_superadmin) {
         query += ' WHERE farm_id = $1';
@@ -43,7 +44,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const client = await pool.connect();
   try {
-    const { farm_id } = await getSessionInfo();
+    const session = await requirePermission('crops:write');
+    const { farm_id } = session;
     if (!farm_id) throw new Error('Unauthorized'); // Block Super Admin for now
 
     const body = await request.json();
@@ -69,6 +71,7 @@ export async function POST(request: Request) {
       status || 'Growing'
     ];
     const result = await client.query(query, values);
+    await logAudit(session, 'crop.created', 'crop', result.rows[0].id, { plot_number, crop_type });
     return NextResponse.json(result.rows[0]);
   } catch (error: any) {
     console.error(error);
@@ -82,7 +85,8 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const client = await pool.connect();
   try {
-    const { farm_id, is_superadmin } = await getSessionInfo();
+    const session = await requirePermission('crops:write');
+    const { farm_id, is_superadmin } = session;
     const body = await request.json();
     const { 
       id, plot_number, crop_type, variety, planting_date, expected_harvest_date, 
@@ -92,7 +96,7 @@ export async function PUT(request: Request) {
 
     // ✅ Logic: Super Admin can update ANY crop by ID. Client restricted by farm_id.
     let whereClause = "WHERE id = $12";
-    let values = [
+    const values = [
       plot_number, crop_type, variety, planting_date, expected_harvest_date,
       plot_size_acres, location, estimated_yield_kg, actual_yield_kg, 
       harvest_notes, status, id
@@ -119,6 +123,7 @@ export async function PUT(request: Request) {
         return NextResponse.json({ error: 'Crop not found' }, { status: 404 });
     }
 
+    await logAudit(session, 'crop.updated', 'crop', id, { plot_number, crop_type, status });
     return NextResponse.json(result.rows[0]);
   } catch (error: any) {
     return NextResponse.json({ error: 'Failed' }, { status: error.message === 'Unauthorized' ? 401 : 500 });
@@ -131,7 +136,8 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
     const client = await pool.connect();
     try {
-        const { farm_id, is_superadmin } = await getSessionInfo();
+        const session = await requirePermission('crops:write');
+        const { farm_id, is_superadmin } = session;
         const { id } = await request.json();
         
         if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
@@ -140,7 +146,7 @@ export async function DELETE(request: Request) {
         
         // 1. Check Existence & Ownership
         let checkQuery = 'SELECT id FROM crops WHERE id = $1';
-        let checkParams = [id];
+        const checkParams = [id];
 
         if (!is_superadmin) {
             if (!farm_id) throw new Error('Unauthorized');
@@ -162,6 +168,7 @@ export async function DELETE(request: Request) {
         await client.query('DELETE FROM crops WHERE id = $1', [id]);
         
         await client.query('COMMIT');
+        await logAudit(session, 'crop.deleted', 'crop', id);
         return NextResponse.json({ success: true });
     } catch (error: any) {
         await client.query('ROLLBACK');

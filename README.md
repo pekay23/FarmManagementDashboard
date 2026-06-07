@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hughes Farms — Farm Management Dashboard
 
-## Getting Started
+An **offline-first** PWA for small-to-mid mixed crop-and-livestock farms.
+Dexie/IndexedDB is the source of truth on the device; the app syncs to
+Postgres in the background and keeps working without internet.
 
-First, run the development server:
+**Live:** https://farm-management-dashboard.vercel.app
+
+## Stack
+
+- **Frontend** — Next.js 16 (App Router, Turbopack dev), React 19,
+  TypeScript 6
+- **Styling** — Tailwind CSS 4 (CSS-first `@theme`), Inter, Lucide icons
+- **Local DB** — Dexie 4 (IndexedDB)
+- **Server DB** — Postgres via `pg` / `@neondatabase/serverless`
+- **Auth** — NextAuth v4 (credentials, JWT, multi-tenant)
+- **PWA** — `next-pwa` (manifest + service worker)
+- **Charts** — Recharts
+- **PDF** — jsPDF + canvg (per-animal health booklets)
+- **Theming** — `next-themes` with light + dark palettes
+- **Lint** — ESLint 10 (with a small upstream-compat patch for
+  `eslint-plugin-react`, applied automatically on every `bun install`)
+- **Package manager** — bun
+
+## Quick start
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bun install           # Install deps (auto-applies the eslint-plugin-react patch)
+cp .env.example .env.local
+bun run dev           # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+See [docs/guides/setup.md](./docs/guides/setup.md) for full setup,
+[docs/guides/deployment.md](./docs/guides/deployment.md) for the Vercel
+deployment walkthrough.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command            | What it does                                              |
+| ------------------ | --------------------------------------------------------- |
+| `bun run dev`      | Dev server (Turbopack) on http://localhost:3000           |
+| `bun run build`    | Production build (webpack)                                |
+| `bun run start`    | Run the production build locally                          |
+| `bun run lint`     | ESLint 10                                                 |
+| `bun run docs:html`| Regenerate the static HTML mirror of `docs/`              |
 
-## Learn More
+## Deploying
 
-To learn more about Next.js, take a look at the following resources:
+Hosted on **Vercel** — see [docs/guides/deployment.md](./docs/guides/deployment.md)
+for the full walkthrough. Production URL:
+**https://farm-management-dashboard.vercel.app**
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Every push to `main` triggers a production deploy; every PR gets a
+preview URL.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Documentation
 
-## Deploy on Vercel
+Full docs live in [`docs/`](./docs/README.md):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- [Architecture](./docs/architecture/system-overview.md) — what the
+  app does, data model, offline sync flow
+- [Design system](./docs/design/01-foundations.md) — colours,
+  typography, components, motion
+- [Guides](./docs/guides/setup.md) — setup, deployment, contributing
+- [Audits](./docs/audits/known-issues.md) — known issues + workarounds
+- [Plans](./docs/plans/future-plans.md) — roadmap
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+A static HTML mirror of the docs lives at `docs/html/index.html`
+(regenerate with `bun run docs:html`).
+
+## License
+
+Private / client work. See `docs/PORTFOLIO-SUMMARY.md` for the public
+write-up.

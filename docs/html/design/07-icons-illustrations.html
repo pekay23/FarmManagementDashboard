@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>07 · Icons & illustrations · Hughes Farms</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<div class="he-shell he-shell--wide">
+
+<nav class="he-nav">
+  <a class="he-nav__brand" href="../index.html">Hughes Farms <small>docs</small></a>
+  <div class="he-nav__links">
+    <a href="../index.html">Index</a>
+    <a href="../architecture/system-overview.html">Architecture</a>
+    <a href="../design/01-foundations.html">Design</a>
+    <a href="../guides/setup.html">Guides</a>
+    <a href="../audits/known-issues.html">Audits</a>
+    <a href="../plans/future-plans.html">Plans</a>
+  </div>
+</nav>
+<div class="he-layout">
+<main class="he-main">
+<header>
+  <p class="he-eyebrow">Design</p>
+  <h1 class="he-title">07 · Icons & illustrations</h1>
+  <p class="he-deck">Every icon in the app comes from <a href="https://lucide.dev">Lucide</a> (via <code>lucide-react@1.x</code>). Lucide was chosen because…</p>
+</header>
+<section class="he-section" id="icon-set-lucide">
+  <div class="he-section__num">01 · Icon set — Lucide</div>
+  <h2 class="he-section__title">Icon set — Lucide</h2><p>Every icon in the app comes from <a href="https://lucide.dev" target="_blank" rel="noopener noreferrer">Lucide</a> (via
+<code>lucide-react@1.x</code>). Lucide was chosen because:</p>
+<ul>
+<li>It&#39;s a <strong>tree-shakeable</strong> ESM package — only the icons you import
+ship in the bundle.</li>
+<li>The stroke style is consistent at 1.5 px and matches Inter&#39;s tone.</li>
+<li>All icons are <strong>SVG</strong> (no emoji, no icon fonts), which keeps them
+crisp at any DPI and accessible to screen readers.</li>
+</ul>
+<h3 id="import-convention">Import convention</h3><pre><code class="language-tsx">import {
+  Sprout, Tractor, Beef, Package, Users, ClipboardList,
+  TrendingDown, DollarSign, BarChart3, Settings, Home,
+  LayoutDashboard, Shield, LogOut, Menu, X
+} from "lucide-react";</code></pre><p>Group all imports for a single file in one statement, sorted
+alphabetically, with a single multi-line format.</p>
+<h3 id="sizing">Sizing</h3><p>Icons use one of five size classes. Don&#39;t pass arbitrary px values.</p>
+<table>
+<thead>
+<tr>
+<th>Tailwind class</th>
+<th>Px</th>
+<th>Used for</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>w-3 h-3</code></td>
+<td>12</td>
+<td>Inline indicators next to small text</td>
+</tr>
+<tr>
+<td><code>w-3.5 h-3.5</code></td>
+<td>14</td>
+<td>Inline indicators next to body text</td>
+</tr>
+<tr>
+<td><code>w-4 h-4</code></td>
+<td>16</td>
+<td>Button icons, table-row actions</td>
+</tr>
+<tr>
+<td><code>w-5 h-5</code></td>
+<td>20</td>
+<td>Sidebar nav items, modal headers</td>
+</tr>
+<tr>
+<td><code>w-6 h-6</code></td>
+<td>24</td>
+<td>KPI card icon tiles</td>
+</tr>
+</tbody></table>
+<h3 id="colour">Colour</h3><p>Icons inherit <code>currentColor</code>, so colour them by setting the text colour
+on the parent:</p>
+<pre><code class="language-tsx"><button className="text-muted-foreground hover:text-foreground">
+  <Pencil className="w-4 h-4" />
+</button></code></pre><p>For coloured status icons (e.g. a red trash button) set the colour
+explicitly via the wrapper:</p>
+<pre><code class="language-tsx"><button className="text-gray-500 hover:text-destructive">
+  <Trash2 className="w-4 h-4" />
+</button></code></pre><section class="he-section" id="the-farm-logo">
+  <div class="he-section__num">02 · The farm logo</div>
+  <h2 class="he-section__title">The farm logo</h2><p>A hand-drawn tractor-with-fields SVG, embedded as a base64 string in
+<code>lib/logo.ts</code> and re-used by:</p>
+<ul>
+<li>the sidebar header (the green tile + &quot;Hughes Farms&quot; wordmark);</li>
+<li>the login page (the larger 24-px icon above the sign-in form);</li>
+<li>PDF exports (decoded and rendered into the header by
+<code>lib/pdfUtils.ts</code> via <code>canvg</code>).</li>
+</ul>
+<p>The base64 inlining keeps the PDF-export path synchronous and avoids
+any <code>fetch</code> of an asset at runtime. To replace the logo, drop a new
+SVG into <code>public/farmslogo.svg</code> and regenerate the base64 constant
+with the helper in <code>convert_logo.py</code> at the repo root.</p>
+<section class="he-section" id="illustrations">
+  <div class="he-section__num">03 · Illustrations</div>
+  <h2 class="he-section__title">Illustrations</h2><p>The app has <strong>no decorative illustrations</strong>. Empty states use a single
+faded Lucide icon (e.g. <code><Sprout className="w-12 h-12 mb-2 opacity-20" /></code>)
+plus a one-line description — this keeps the bundle small and the
+&quot;feel&quot; consistent across the app.</p>
+<p>If you ever need richer illustrations, prefer a <strong>single monochrome
+SVG per concept</strong> (sized at 1.5 px stroke to match Lucide) in a
+muted <code>text-muted-foreground</code> so it doesn&#39;t fight the data.</p>
+
+</main>
+
+<aside class="he-toc" aria-label="On this page">
+  <p class="he-toc__label">On this page</p>
+  <ul>
+    <li class="he-toc__l2"><a href="#icon-set-lucide">Icon set — Lucide</a></li>
+    <li class="he-toc__l3"><a href="#import-convention">Import convention</a></li>
+    <li class="he-toc__l3"><a href="#sizing">Sizing</a></li>
+    <li class="he-toc__l3"><a href="#colour">Colour</a></li>
+    <li class="he-toc__l2"><a href="#the-farm-logo">The farm logo</a></li>
+    <li class="he-toc__l2"><a href="#illustrations">Illustrations</a></li>
+  </ul>
+</aside>
+</div>
+<footer class="he-foot">
+  Source · <a href="../../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+</footer>
+</div>
+</body>
+</html>

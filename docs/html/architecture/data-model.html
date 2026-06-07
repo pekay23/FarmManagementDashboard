@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Data model · Hughes Farms</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<div class="he-shell he-shell--wide">
+
+<nav class="he-nav">
+  <a class="he-nav__brand" href="../index.html">Hughes Farms <small>docs</small></a>
+  <div class="he-nav__links">
+    <a href="../index.html">Index</a>
+    <a href="../architecture/system-overview.html">Architecture</a>
+    <a href="../design/01-foundations.html">Design</a>
+    <a href="../guides/setup.html">Guides</a>
+    <a href="../audits/known-issues.html">Audits</a>
+    <a href="../plans/future-plans.html">Plans</a>
+  </div>
+</nav>
+<div class="he-layout">
+<main class="he-main">
+<header>
+  <p class="he-eyebrow">Architecture</p>
+  <h1 class="he-title">Data model</h1>
+  <p class="he-deck">The Hughes Farms schema lives in <strong>two places</strong> that must stay in sync…</p>
+</header>
+<p>Every server-side row carries a <code>farm_id</code> matching the user&#39;s tenant.
+The JWT exposes <code>farm_id</code>; API handlers must filter by it. The single
+exception is <code>is_superadmin === true</code>, which bypasses the <code>farm_id</code>
+filter and can aggregate across tenants (used by the
+<code>/admin/users</code> screen and the cross-farm dashboard view).</p>
+
+</main>
+
+<aside class="he-toc" aria-label="On this page">
+  <p class="he-toc__label">On this page</p>
+  <ul>
+    <li class="he-toc__l2"><a href="#shared-base-syncable">Shared base — `Syncable</a></li>
+    <li class="he-toc__l2"><a href="#entities-dexie-tables-postgres-tables">Entities (Dexie tables ↔ Postgres tables)</a></li>
+    <li class="he-toc__l2"><a href="#server-only-tables-no-dexie-mirror">Server-only tables (no Dexie mirror)</a></li>
+    <li class="he-toc__l2"><a href="#indexes-dexie-schema-string">Indexes (Dexie schema string)</a></li>
+    <li class="he-toc__l2"><a href="#database-name-version">Database name + version</a></li>
+    <li class="he-toc__l2"><a href="#soft-delete-convention">Soft-delete convention</a></li>
+    <li class="he-toc__l2"><a href="#multi-tenancy">Multi-tenancy</a></li>
+  </ul>
+</aside>
+</div>
+<footer class="he-foot">
+  Source · <a href="../../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+</footer>
+</div>
+</body>
+</html>

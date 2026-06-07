@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   
   try {
     const { farm_id, is_superadmin } = await getSessionInfo();
-    let result: any = { kpi: {}, charts: {} };
+    const result: any = { kpi: {}, charts: {} };
     const interval = period === 'year' ? '1 year' : period === 'all' ? '100 years' : '30 days';
 
     const where = is_superadmin ? "1=1" : "farm_id = $1";

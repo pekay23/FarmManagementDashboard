@@ -93,6 +93,43 @@ export interface Treatment extends Syncable {
   notes?: string;
 }
 
+export interface FieldScouting extends Syncable {
+  crop_id?: string;
+  field_name: string;
+  scout_date: string;
+  crop_stage?: string;
+  issue_type: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  latitude?: number;
+  longitude?: number;
+  notes?: string;
+  recommendation?: string;
+  status: 'open' | 'monitoring' | 'resolved';
+}
+
+export interface Attachment extends Syncable {
+  entity_type: string;
+  entity_id: string;
+  file_name: string;
+  file_type?: string;
+  file_size?: number;
+  url?: string;
+  data_url?: string;
+  notes?: string;
+}
+
+export interface SyncConflict {
+  id: string;
+  table_name: string;
+  record_id: string;
+  local_data: any;
+  server_data?: any;
+  reason: string;
+  status: 'open' | 'resolved' | 'ignored';
+  createdAt: string;
+  updatedAt: string;
+}
+
 // --- DATABASE CLASS ---
 export class FarmDatabase extends Dexie {
   employees!: Table<Employee, string>;
@@ -104,6 +141,9 @@ export class FarmDatabase extends Dexie {
   livestock!: Table<Livestock, string>;
   livestock_logs!: Table<LivestockLog, string>;
   treatments!: Table<Treatment, string>;
+  scouting!: Table<FieldScouting, string>;
+  attachments!: Table<Attachment, string>;
+  sync_conflicts!: Table<SyncConflict, string>;
 
   constructor() {
     // CHANGED NAME TO 'HughesFarmDB_v2' TO FORCE RESET
@@ -119,6 +159,21 @@ export class FarmDatabase extends Dexie {
       livestock: 'id, animal_id, species, health_status, syncStatus, createdAt, updatedAt',
       livestock_logs: 'id, livestock_id, type, date, syncStatus, createdAt, updatedAt',
       treatments: 'id, crop_id, treatment_date, syncStatus, createdAt, updatedAt',
+    });
+
+    this.version(2).stores({
+      employees: 'id, name, role, phone, isActive, syncStatus, createdAt, updatedAt',
+      tasks: 'id, title, status, priority, assignedTo, dueDate, syncStatus, createdAt, updatedAt',
+      crops: 'id, plot_number, crop_type, status, location, planting_date, syncStatus, createdAt, updatedAt',
+      inventory: 'id, name, category, quantity, lowStockThreshold, syncStatus, createdAt, updatedAt',
+      sales: 'id, date, customer, amount, syncStatus, createdAt, updatedAt',
+      expenses: 'id, title, category, date, amount, syncStatus, createdAt, updatedAt',
+      livestock: 'id, animal_id, species, health_status, syncStatus, createdAt, updatedAt',
+      livestock_logs: 'id, livestock_id, type, date, syncStatus, createdAt, updatedAt',
+      treatments: 'id, crop_id, treatment_date, syncStatus, createdAt, updatedAt',
+      scouting: 'id, field_name, scout_date, severity, status, syncStatus, createdAt, updatedAt',
+      attachments: 'id, entity_type, entity_id, file_name, syncStatus, createdAt, updatedAt',
+      sync_conflicts: 'id, table_name, record_id, status, createdAt, updatedAt',
     });
   }
 }

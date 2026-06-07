@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Data flow & offline sync · Hughes Farms</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<div class="he-shell he-shell--wide">
+
+<nav class="he-nav">
+  <a class="he-nav__brand" href="../index.html">Hughes Farms <small>docs</small></a>
+  <div class="he-nav__links">
+    <a href="../index.html">Index</a>
+    <a href="../architecture/system-overview.html">Architecture</a>
+    <a href="../design/01-foundations.html">Design</a>
+    <a href="../guides/setup.html">Guides</a>
+    <a href="../audits/known-issues.html">Audits</a>
+    <a href="../plans/future-plans.html">Plans</a>
+  </div>
+</nav>
+<div class="he-layout">
+<main class="he-main">
+<header>
+  <p class="he-eyebrow">Architecture</p>
+  <h1 class="he-title">Data flow & offline sync</h1>
+  <p class="he-deck">Hughes Farms is <strong>offline-first</strong>: every screen reads from and writes to the on-device IndexedDB (Dexie).</p>
+</header>
+<p>The dashboard header shows a small <code>⚡ Offline Ready</code> chip when the
+device hasn&#39;t pinged the server in the current session. The same flag
+suppresses the auto-poll to avoid burning battery when there&#39;s no hope
+of a successful round-trip.</p>
+
+</main>
+
+<aside class="he-toc" aria-label="On this page">
+  <p class="he-toc__label">On this page</p>
+  <ul>
+    <li class="he-toc__l2"><a href="#read-path-server-client">Read path (server → client)</a></li>
+    <li class="he-toc__l2"><a href="#write-path-client-server">Write path (client → server)</a></li>
+    <li class="he-toc__l2"><a href="#sync-status-lifecycle">Sync status lifecycle</a></li>
+    <li class="he-toc__l2"><a href="#the-synccontext-provider">The `SyncContext` provider</a></li>
+    <li class="he-toc__l2"><a href="#conflict-resolution">Conflict resolution</a></li>
+    <li class="he-toc__l2"><a href="#api-surface-one-endpoint-per-entity">API surface (one endpoint per entity)</a></li>
+    <li class="he-toc__l2"><a href="#offline-ready-badge-in-the-ui">"Offline ready" badge in the UI</a></li>
+  </ul>
+</aside>
+</div>
+<footer class="he-foot">
+  Source · <a href="../../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+</footer>
+</div>
+</body>
+</html>

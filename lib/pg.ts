@@ -5,8 +5,6 @@ declare global {
   var pgPool: Pool | undefined;
 }
 
-let pool: Pool;
-
 if (!global.pgPool) {
   global.pgPool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -17,6 +15,6 @@ if (!global.pgPool) {
   });
 }
 
-pool = global.pgPool;
+const pool = global.pgPool;
 
 export default pool;

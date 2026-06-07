@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>04 · Sizing & spacing · Hughes Farms</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<div class="he-shell he-shell--wide">
+
+<nav class="he-nav">
+  <a class="he-nav__brand" href="../index.html">Hughes Farms <small>docs</small></a>
+  <div class="he-nav__links">
+    <a href="../index.html">Index</a>
+    <a href="../architecture/system-overview.html">Architecture</a>
+    <a href="../design/01-foundations.html">Design</a>
+    <a href="../guides/setup.html">Guides</a>
+    <a href="../audits/known-issues.html">Audits</a>
+    <a href="../plans/future-plans.html">Plans</a>
+  </div>
+</nav>
+<div class="he-layout">
+<main class="he-main">
+<header>
+  <p class="he-eyebrow">Design</p>
+  <h1 class="he-title">04 · Sizing & spacing</h1>
+  <p class="he-deck">Tailwind 4 ships a 4-px base spacing scale by default.</p>
+</header>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>z-index</th>
+<th>Examples</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Sidebar (desktop)</td>
+<td>40</td>
+<td><code>z-40</code></td>
+</tr>
+<tr>
+<td>Backdrop / overlay</td>
+<td>30</td>
+<td><code>z-30</code> (mobile menu backdrop)</td>
+</tr>
+<tr>
+<td>Toast</td>
+<td>50</td>
+<td><code>z-50</code> (Sonner toasts)</td>
+</tr>
+<tr>
+<td>Modal</td>
+<td>50</td>
+<td><code>z-50</code> (confirm delete, form modals)</td>
+</tr>
+</tbody></table>
+
+</main>
+
+<aside class="he-toc" aria-label="On this page">
+  <p class="he-toc__label">On this page</p>
+  <ul>
+    <li class="he-toc__l2"><a href="#spacing-scale-4-px-base">Spacing scale (4-px base)</a></li>
+    <li class="he-toc__l2"><a href="#container-widths">Container widths</a></li>
+    <li class="he-toc__l2"><a href="#breakpoints">Breakpoints</a></li>
+    <li class="he-toc__l2"><a href="#touch-targets">Touch targets</a></li>
+    <li class="he-toc__l2"><a href="#radii">Radii</a></li>
+    <li class="he-toc__l2"><a href="#elevation">Elevation</a></li>
+    <li class="he-toc__l2"><a href="#z-index-scale">Z-index scale</a></li>
+  </ul>
+</aside>
+</div>
+<footer class="he-foot">
+  Source · <a href="../../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+</footer>
+</div>
+</body>
+</html>

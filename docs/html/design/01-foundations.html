@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>01 · Foundations · Hughes Farms</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<div class="he-shell he-shell--wide">
+
+<nav class="he-nav">
+  <a class="he-nav__brand" href="../index.html">Hughes Farms <small>docs</small></a>
+  <div class="he-nav__links">
+    <a href="../index.html">Index</a>
+    <a href="../architecture/system-overview.html">Architecture</a>
+    <a href="../design/01-foundations.html">Design</a>
+    <a href="../guides/setup.html">Guides</a>
+    <a href="../audits/known-issues.html">Audits</a>
+    <a href="../plans/future-plans.html">Plans</a>
+  </div>
+</nav>
+<div class="he-layout">
+<main class="he-main">
+<header>
+  <p class="he-eyebrow">Design</p>
+  <h1 class="he-title">01 · Foundations</h1>
+  
+</header>
+<blockquote>
+<p>Brand voice, where every token lives, and a hex cheat-sheet for the
+rest of the design system. See <code>02-colors.md</code> through
+<code>07-icons-illustrations.md</code> for the deep references.</p>
+</blockquote>
+<section class="he-section" id="voice-visual-language">
+  <div class="he-section__num">01 · Voice & visual language</div>
+  <h2 class="he-section__title">Voice &amp; visual language</h2><ul>
+<li><strong>Earth-toned, practical, mobile-first.</strong> The product is built for
+farm owners and managers who may be using a tablet in a barn with
+one hand and a half-full cup of coffee in the other. Type is large,
+tap targets are at least 44×44 px, contrast clears WCAG AA.</li>
+<li><strong>Headings lean on weight, not size.</strong> Inter handles hierarchy
+through <code>font-bold</code> / <code>font-semibold</code> rather than dramatic jumps in
+<code>font-size</code>. Cards use <code>rounded-xl</code> and <code>shadow-sm</code> rather than
+heavy borders to keep the surface calm.</li>
+<li><strong>One accent color does the work.</strong> Brand teal (<code>brand-600</code>
+<code>#059669</code>) is the only saturated hue; everything else is either a
+neutral slate or a muted semantic state (<code>success</code>, <code>warning</code>, <code>info</code>,
+<code>destructive</code>).</li>
+<li><strong>Two backgrounds.</strong> Light mode is paper-white (#ffffff) on slate-900
+ink; dark mode is slate-950 on slate-50. The sidebar stays in
+emerald/teal in both modes (it&#39;s a brand element, not a surface).</li>
+</ul>
+<section class="he-section" id="where-every-token-comes-from">
+  <div class="he-section__num">02 · Where every token comes from</div>
+  <h2 class="he-section__title">Where every token comes from</h2><table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>File</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Colour + font CSS vars</td>
+<td><code>app/globals.css</code></td>
+</tr>
+<tr>
+<td>Tailwind 4 theme map</td>
+<td><code>@theme inline { … }</code> block in <code>globals.css</code></td>
+</tr>
+<tr>
+<td>Base element defaults</td>
+<td><code>globals.css</code> (<code>html</code> / <code>body</code> / <code>*</code>)</td>
+</tr>
+<tr>
+<td>Font loading</td>
+<td><code>app/layout.tsx</code> (next/font Inter)</td>
+</tr>
+<tr>
+<td>Dark-mode toggle</td>
+<td><code>next-themes</code> via <code>components/ThemeProvider.tsx</code></td>
+</tr>
+<tr>
+<td>Theme toggle button</td>
+<td><code>components/ThemeToggle.tsx</code> (in Sidebar)</td>
+</tr>
+<tr>
+<td>Sidebar gradient</td>
+<td><code>.bg-sidebar-gradient</code> utility in <code>globals.css</code></td>
+</tr>
+<tr>
+<td>Logo</td>
+<td><code>lib/logo.ts</code> (base64-embedded SVG)</td>
+</tr>
+</tbody></table>
+<section class="he-section" id="hex-cheat-sheet">
+  <div class="he-section__num">03 · Hex cheat-sheet</div>
+  <h2 class="he-section__title">Hex cheat-sheet</h2><table>
+<thead>
+<tr>
+<th>Token</th>
+<th>Hex</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--brand-50</code></td>
+<td><code>#ecfdf5</code></td>
+<td>Brand surface (very light)</td>
+</tr>
+<tr>
+<td><code>--brand-500</code></td>
+<td><code>#10b981</code></td>
+<td>Brand accent (focus rings, chart-1)</td>
+</tr>
+<tr>
+<td><code>--brand-600</code></td>
+<td><code>#059669</code></td>
+<td>Primary buttons, brand chrome</td>
+</tr>
+<tr>
+<td><code>--brand-700</code></td>
+<td><code>#047857</code></td>
+<td>Primary button hover</td>
+</tr>
+<tr>
+<td><code>--background</code> (light)</td>
+<td><code>#ffffff</code></td>
+<td>Page background</td>
+</tr>
+<tr>
+<td><code>--foreground</code> (light)</td>
+<td><code>#0f172a</code></td>
+<td>Default body text</td>
+</tr>
+<tr>
+<td><code>--background</code> (dark)</td>
+<td><code>#020617</code></td>
+<td>Page background</td>
+</tr>
+<tr>
+<td><code>--foreground</code> (dark)</td>
+<td><code>#f8fafc</code></td>
+<td>Default body text</td>
+</tr>
+<tr>
+<td><code>--muted-foreground</code></td>
+<td><code>#64748b</code> / <code>#94a3b8</code> (dark)</td>
+<td>Captions, helper text</td>
+</tr>
+<tr>
+<td><code>--border</code></td>
+<td><code>#e2e8f0</code> / <code>#1e293b</code> (dark)</td>
+<td>1 px borders</td>
+</tr>
+<tr>
+<td><code>--destructive</code></td>
+<td><code>#ef4444</code> / <code>#b91c1c</code> (dark)</td>
+<td>Errors, destructive</td>
+</tr>
+<tr>
+<td><code>--sidebar-from</code></td>
+<td><code>#064e3b</code></td>
+<td>Sidebar gradient start (light)</td>
+</tr>
+<tr>
+<td><code>--sidebar-to</code></td>
+<td><code>#134e4a</code></td>
+<td>Sidebar gradient end   (light)</td>
+</tr>
+<tr>
+<td><code>--sidebar-from</code> (dark)</td>
+<td><code>#020617</code></td>
+<td>Sidebar gradient start (dark)</td>
+</tr>
+<tr>
+<td><code>--sidebar-to</code>   (dark)</td>
+<td><code>#0f172a</code></td>
+<td>Sidebar gradient end   (dark)</td>
+</tr>
+</tbody></table>
+<section class="he-section" id="three-canonical-looks-coexist-in-the-app">
+  <div class="he-section__num">04 · Three canonical "looks" coexist in the app</div>
+  <h2 class="he-section__title">Three canonical &quot;looks&quot; coexist in the app</h2><ul>
+<li><strong>Dashboard / list pages</strong> — white card on light page background,
+border + shadow. Brand-teal accent for active states.</li>
+<li><strong>Modal dialogs</strong> — same card chrome as list pages, with a backdrop
+blur. Use the <code>Modal</code> helper inside each feature page (it lives next
+to the page that uses it, e.g. <code>crops/page.tsx</code>).</li>
+<li><strong>Sidebar</strong> — full-height gradient (<code>emerald-900</code> → <code>teal-900</code> in
+light, <code>slate-950</code> → <code>slate-900</code> in dark), white text, no borders
+between nav items.</li>
+</ul>
+<section class="he-section" id="where-to-read-next">
+  <div class="he-section__num">05 · Where to read next</div>
+  <h2 class="he-section__title">Where to read next</h2><ul>
+<li><a href="./02-colors.html">02 · Colors</a> — every token, with HSL/hex, light + dark</li>
+<li><a href="./03-typography.html">03 · Typography</a> — Inter scale + line-heights</li>
+<li><a href="./05-components.html">05 · Components</a> — button, card, modal, form</li>
+</ul>
+
+</main>
+
+<aside class="he-toc" aria-label="On this page">
+  <p class="he-toc__label">On this page</p>
+  <ul>
+    <li class="he-toc__l2"><a href="#voice-visual-language">Voice & visual language</a></li>
+    <li class="he-toc__l2"><a href="#where-every-token-comes-from">Where every token comes from</a></li>
+    <li class="he-toc__l2"><a href="#hex-cheat-sheet">Hex cheat-sheet</a></li>
+    <li class="he-toc__l2"><a href="#three-canonical-looks-coexist-in-the-app">Three canonical "looks" coexist in the app</a></li>
+    <li class="he-toc__l2"><a href="#where-to-read-next">Where to read next</a></li>
+  </ul>
+</aside>
+</div>
+<footer class="he-foot">
+  Source · <a href="../../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+</footer>
+</div>
+</body>
+</html>

@@ -33,7 +33,7 @@ export default function Reports() {
   async function generateLocalReport() {
     setLoading(true);
     try {
-      let result: any = { kpi: {}, charts: {} };
+      const result: any = { kpi: {}, charts: {} };
       const now = new Date();
       
       // Calculate Date Range
@@ -296,10 +296,10 @@ export default function Reports() {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
-        doc.text(`Page ${i} of ${pageCount} - Hughes Farms Proprietary Data`, 105, 290, { align: "center" });
+        doc.text(`Page ${i} of ${pageCount} - FieldOps Farm Report`, 105, 290, { align: "center" });
     }
 
-    doc.save(`HughesFarm_${reportType}_${Date.now()}.pdf`);
+    doc.save(`FieldOps_${reportType}_${Date.now()}.pdf`);
     toast.success("Professional report generated!");
   }
 

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Deployment · Hughes Farms</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<div class="he-shell he-shell--wide">
+
+<nav class="he-nav">
+  <a class="he-nav__brand" href="../index.html">Hughes Farms <small>docs</small></a>
+  <div class="he-nav__links">
+    <a href="../index.html">Index</a>
+    <a href="../architecture/system-overview.html">Architecture</a>
+    <a href="../design/01-foundations.html">Design</a>
+    <a href="../guides/setup.html">Guides</a>
+    <a href="../audits/known-issues.html">Audits</a>
+    <a href="../plans/future-plans.html">Plans</a>
+  </div>
+</nav>
+<div class="he-layout">
+<main class="he-main">
+<header>
+  <p class="he-eyebrow">Guides</p>
+  <h1 class="he-title">Deployment</h1>
+  <p class="he-deck">The app is configured to deploy to <strong>Vercel</strong> (see <code>vercel.json</code> in the repo root).</p>
+</header>
+<p>The repo is no longer configured for Netlify (<code>netlify.toml</code> was
+removed in the Vercel migration). To re-enable, restore the
+<code>netlify.toml</code> from git history and follow Netlify&#39;s
+<a href="https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/" target="_blank" rel="noopener noreferrer">Next.js runtime docs</a>.</p>
+
+</main>
+
+<aside class="he-toc" aria-label="On this page">
+  <p class="he-toc__label">On this page</p>
+  <ul>
+    <li class="he-toc__l2"><a href="#vercel-primary">Vercel (primary)</a></li>
+    <li class="he-toc__l3"><a href="#first-time-setup">First-time setup</a></li>
+    <li class="he-toc__l3"><a href="#branches-environments">Branches & environments</a></li>
+    <li class="he-toc__l3"><a href="#continuous-deployment">Continuous deployment</a></li>
+    <li class="he-toc__l2"><a href="#local-preview-against-production-data">Local preview against production data</a></li>
+    <li class="he-toc__l2"><a href="#build-verification">Build verification</a></li>
+    <li class="he-toc__l2"><a href="#migrations">Migrations</a></li>
+    <li class="he-toc__l2"><a href="#if-you-still-need-netlify">If you still need Netlify</a></li>
+  </ul>
+</aside>
+</div>
+<footer class="he-foot">
+  Source · <a href="../../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+</footer>
+</div>
+</body>
+</html>

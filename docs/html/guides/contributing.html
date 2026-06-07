@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Contributing · Hughes Farms</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<div class="he-shell he-shell--wide">
+
+<nav class="he-nav">
+  <a class="he-nav__brand" href="../index.html">Hughes Farms <small>docs</small></a>
+  <div class="he-nav__links">
+    <a href="../index.html">Index</a>
+    <a href="../architecture/system-overview.html">Architecture</a>
+    <a href="../design/01-foundations.html">Design</a>
+    <a href="../guides/setup.html">Guides</a>
+    <a href="../audits/known-issues.html">Audits</a>
+    <a href="../plans/future-plans.html">Plans</a>
+  </div>
+</nav>
+<div class="he-layout">
+<main class="he-main">
+<header>
+  <p class="he-eyebrow">Guides</p>
+  <h1 class="he-title">Contributing</h1>
+  <p class="he-deck">Examples: <code>feat/livestock-pdf-export</code>, <code>fix/sync-offline-crash</code>, <code>chore/upgrade-tailwind-v4</code>.</p>
+</header>
+<section class="he-section" id="branch-naming">
+  <div class="he-section__num">01 · Branch naming</div>
+  <h2 class="he-section__title">Branch naming</h2><table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>feat/</code></td>
+<td>New user-facing feature</td>
+</tr>
+<tr>
+<td><code>fix/</code></td>
+<td>Bug fix</td>
+</tr>
+<tr>
+<td><code>chore/</code></td>
+<td>Refactor, dependency bump, tooling</td>
+</tr>
+<tr>
+<td><code>docs/</code></td>
+<td>Markdown / docs-only change</td>
+</tr>
+<tr>
+<td><code>design/</code></td>
+<td>Design system tokens or component changes</td>
+</tr>
+</tbody></table>
+<p>Examples: <code>feat/livestock-pdf-export</code>, <code>fix/sync-offline-crash</code>,
+<code>chore/upgrade-tailwind-v4</code>.</p>
+<section class="he-section" id="commit-messages">
+  <div class="he-section__num">02 · Commit messages</div>
+  <h2 class="he-section__title">Commit messages</h2><p>Use <a href="https://www.conventionalcommits.org/" target="_blank" rel="noopener noreferrer">Conventional Commits</a> so
+<code>CHANGELOG.md</code> can be auto-generated later:</p>
+<pre><code>feat(crops): add per-treatment cost aggregation
+fix(sync): avoid duplicate POST when two devices edit same row
+chore(deps): upgrade tailwindcss to 4.3.0
+docs(architecture): document multi-tenant row-level filtering</code></pre><section class="he-section" id="pull-request-checklist">
+  <div class="he-section__num">03 · Pull-request checklist</div>
+  <h2 class="he-section__title">Pull-request checklist</h2><ul>
+<li><input disabled="" type="checkbox"> <code>bun run lint</code> passes with <strong>zero new errors</strong> (pre-existing
+<code>no-explicit-any</code> warnings are tracked in
+<a href="../audits/known-issues.html">Known issues</a>).</li>
+<li><input disabled="" type="checkbox"> If you touched <code>app/globals.css</code> or any color token, run a
+smoke test in <strong>both</strong> light and dark mode.</li>
+<li><input disabled="" type="checkbox"> If you added a new entity, mirror it in
+<code>docs/architecture/data-model.md</code> + add a sync status table.</li>
+<li><input disabled="" type="checkbox"> If you added a new icon, confirm it imports from
+<code>lucide-react</code> (no emoji).</li>
+<li><input disabled="" type="checkbox"> Screenshots in the PR description for any visual change.</li>
+</ul>
+<section class="he-section" id="code-style">
+  <div class="he-section__num">04 · Code style</div>
+  <h2 class="he-section__title">Code style</h2><ul>
+<li><strong>TypeScript strict</strong> — no <code>any</code> in new code (cast through a
+<code>unknown</code> if you really have to).</li>
+<li><strong>Tailwind utility classes only</strong> — no inline <code>style={{}}</code> for
+anything that could be a class.</li>
+<li><strong><code>&#39;use client&#39;</code></strong> only when you need state, effects, or browser
+APIs. Pages that just render server data should stay server
+components.</li>
+<li><strong>Dexie reads in <code>useLiveQuery</code></strong> so the UI re-renders on sync.</li>
+<li><strong>Soft-delete</strong> — never <code>db.<table>.delete(id)</code>; flip
+<code>syncStatus</code> to <code>&#39;deleted&#39;</code> and let the sync layer push it.</li>
+</ul>
+<section class="he-section" id="lint-policy">
+  <div class="he-section__num">05 · Lint policy</div>
+  <h2 class="he-section__title">Lint policy</h2><ul>
+<li>New code: 0 errors, 0 new warnings.</li>
+<li>Existing <code>no-explicit-any</code> warnings: allowed, but please fix them
+when you touch the file for unrelated reasons. The full backlog
+lives in <a href="../audits/known-issues.html">Known issues</a>.</li>
+</ul>
+<section class="he-section" id="reviewing">
+  <div class="he-section__num">06 · Reviewing</div>
+  <h2 class="he-section__title">Reviewing</h2><ul>
+<li>At least <strong>one approving review</strong> from a maintainer.</li>
+<li>The author merges after CI is green.</li>
+<li>Squash-merge to keep <code>main</code> linear.</li>
+</ul>
+
+</main>
+
+<aside class="he-toc" aria-label="On this page">
+  <p class="he-toc__label">On this page</p>
+  <ul>
+    <li class="he-toc__l2"><a href="#branch-naming">Branch naming</a></li>
+    <li class="he-toc__l2"><a href="#commit-messages">Commit messages</a></li>
+    <li class="he-toc__l2"><a href="#pull-request-checklist">Pull-request checklist</a></li>
+    <li class="he-toc__l2"><a href="#code-style">Code style</a></li>
+    <li class="he-toc__l2"><a href="#lint-policy">Lint policy</a></li>
+    <li class="he-toc__l2"><a href="#reviewing">Reviewing</a></li>
+  </ul>
+</aside>
+</div>
+<footer class="he-foot">
+  Source · <a href="../../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+</footer>
+</div>
+</body>
+</html>

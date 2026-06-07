@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Setup · Hughes Farms</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<div class="he-shell he-shell--wide">
+
+<nav class="he-nav">
+  <a class="he-nav__brand" href="../index.html">Hughes Farms <small>docs</small></a>
+  <div class="he-nav__links">
+    <a href="../index.html">Index</a>
+    <a href="../architecture/system-overview.html">Architecture</a>
+    <a href="../design/01-foundations.html">Design</a>
+    <a href="../guides/setup.html">Guides</a>
+    <a href="../audits/known-issues.html">Audits</a>
+    <a href="../plans/future-plans.html">Plans</a>
+  </div>
+</nav>
+<div class="he-layout">
+<main class="he-main">
+<header>
+  <p class="he-eyebrow">Guides</p>
+  <h1 class="he-title">Setup</h1>
+  <p class="he-deck">Get a working dev environment in under five minutes.</p>
+</header>
+<ul>
+<li><strong><code>@types/pg</code> is not in <code>devDependencies</code></strong> — <code>tsc --noEmit</code> will
+warn about implicit-any on <code>lib/pg.ts</code>. Either install
+<code>bun add -d @types/pg</code> or ignore the warning; it doesn&#39;t affect
+runtime.</li>
+<li><strong>Service worker caching</strong> — after changing anything in <code>public/</code>,
+do a hard reload (Cmd/Ctrl-Shift-R) or open DevTools → Application
+→ Service Workers → Unregister.</li>
+<li><strong>Dark mode</strong> — toggle via the sun/moon button in the sidebar
+footer. The choice persists in <code>localStorage</code> under the <code>theme</code> key.</li>
+</ul>
+
+</main>
+
+<aside class="he-toc" aria-label="On this page">
+  <p class="he-toc__label">On this page</p>
+  <ul>
+    <li class="he-toc__l2"><a href="#1-prerequisites">1. Prerequisites</a></li>
+    <li class="he-toc__l2"><a href="#2-clone-install">2. Clone & install</a></li>
+    <li class="he-toc__l2"><a href="#3-environment-variables">3. Environment variables</a></li>
+    <li class="he-toc__l2"><a href="#4-database">4. Database</a></li>
+    <li class="he-toc__l2"><a href="#5-run-the-dev-server">5. Run the dev server</a></li>
+    <li class="he-toc__l2"><a href="#6-seed-an-account">6. Seed an account</a></li>
+    <li class="he-toc__l2"><a href="#7-bootstrap-the-first-super-admin-one-time">7. Bootstrap the first super-admin (one-time)</a></li>
+    <li class="he-toc__l2"><a href="#8-verify">8. Verify</a></li>
+    <li class="he-toc__l2"><a href="#common-gotchas">Common gotchas</a></li>
+  </ul>
+</aside>
+</div>
+<footer class="he-foot">
+  Source · <a href="../../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+</footer>
+</div>
+</body>
+</html>
