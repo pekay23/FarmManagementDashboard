@@ -3,6 +3,7 @@ import pool from '@/lib/pg';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import type { Session } from 'next-auth';
+import { logAudit, requirePermission } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,7 +67,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const client = await pool.connect();
   try {
-    const { farm_id } = await getSessionInfo();
+    const session = await requirePermission('employees:write');
+    const { farm_id } = session;
     // Safety: If super admin tries to create without a farm_id context, this will be null/undefined.
     // For robust SaaS, you might want to pass farm_id in body if Super Admin.
     // For now, let's keep it simple: strict farm owner only.
@@ -86,6 +88,7 @@ export async function POST(request: Request) {
 
     const values = [farm_id, full_name, role, contact_info, status || 'Active'];
     const result = await client.query(query, values);
+    await logAudit(session, 'employee.created', 'employee', result.rows[0].id, { full_name, role });
     return NextResponse.json(result.rows[0]);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed';
@@ -100,7 +103,8 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const client = await pool.connect();
   try {
-    const { farm_id } = await getSessionInfo();
+    const session = await requirePermission('employees:write');
+    const { farm_id } = session;
     if (!farm_id) throw new Error('Unauthorized');
 
     const text = await request.text();
@@ -126,6 +130,7 @@ export async function PUT(request: Request) {
         return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
     }
 
+    await logAudit(session, 'employee.updated', 'employee', String(id), { full_name, role, status });
     return NextResponse.json(result.rows[0]);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed';
@@ -140,7 +145,8 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   const client = await pool.connect();
   try {
-    const { farm_id } = await getSessionInfo();
+    const session = await requirePermission('employees:write');
+    const { farm_id } = session;
     if (!farm_id) throw new Error('Unauthorized');
 
     const text = await request.text();
@@ -156,6 +162,7 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
     }
 
+    await logAudit(session, 'employee.deleted', 'employee', String(id));
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed';

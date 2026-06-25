@@ -23,6 +23,7 @@ export const PERMISSIONS = [
   "dashboard:read",
   "crops:write",
   "livestock:write",
+  "employees:write",
   "inventory:write",
   "sales:write",
   "finance:write",
@@ -74,7 +75,7 @@ export async function ensurePlatformTables() {
 
     CREATE TABLE IF NOT EXISTS audit_logs (
       id SERIAL PRIMARY KEY,
-      farm_id INTEGER NULL,
+      farm_id UUID NULL,
       user_id INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
       action TEXT NOT NULL,
       entity_type TEXT NOT NULL,
@@ -88,7 +89,7 @@ export async function ensurePlatformTables() {
 
     CREATE TABLE IF NOT EXISTS field_scouting (
       id SERIAL PRIMARY KEY,
-      farm_id INTEGER NOT NULL,
+      farm_id UUID NOT NULL,
       crop_id TEXT NULL,
       field_name TEXT NOT NULL,
       scout_date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -109,7 +110,7 @@ export async function ensurePlatformTables() {
 
     CREATE TABLE IF NOT EXISTS attachments (
       id SERIAL PRIMARY KEY,
-      farm_id INTEGER NOT NULL,
+      farm_id UUID NOT NULL,
       entity_type TEXT NOT NULL,
       entity_id TEXT NOT NULL,
       file_name TEXT NOT NULL,
@@ -126,7 +127,7 @@ export async function ensurePlatformTables() {
 
     CREATE TABLE IF NOT EXISTS sync_conflicts (
       id SERIAL PRIMARY KEY,
-      farm_id INTEGER NOT NULL,
+      farm_id UUID NOT NULL,
       user_id INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
       table_name TEXT NOT NULL,
       record_id TEXT NOT NULL,

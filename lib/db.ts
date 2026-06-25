@@ -130,6 +130,32 @@ export interface SyncConflict {
   updatedAt: string;
 }
 
+export interface WorkOrder extends Syncable {
+  title: string;
+  description?: string;
+  assigned_to: string;
+  crop_id?: string;
+  start_date: string;
+  end_date?: string;
+  status: 'Draft' | 'In Progress' | 'Completed' | 'Cancelled';
+}
+
+export interface TraceabilityBatch extends Syncable {
+  batch_number: string;
+  crop_id: string;
+  harvest_date: string;
+  quantity: number;
+  quality_grade?: string;
+  notes?: string;
+}
+
+export interface Plan extends Syncable {
+  title: string;
+  type: string;
+  season: string;
+  details: any; // JSON
+}
+
 // --- DATABASE CLASS ---
 export class FarmDatabase extends Dexie {
   employees!: Table<Employee, string>;
@@ -144,10 +170,13 @@ export class FarmDatabase extends Dexie {
   scouting!: Table<FieldScouting, string>;
   attachments!: Table<Attachment, string>;
   sync_conflicts!: Table<SyncConflict, string>;
+  work_orders!: Table<WorkOrder, string>;
+  traceability_batches!: Table<TraceabilityBatch, string>;
+  plans!: Table<Plan, string>;
 
   constructor() {
-    // CHANGED NAME TO 'HughesFarmDB_v2' TO FORCE RESET
-    super('HughesFarmDB_v2');
+    // CHANGED NAME TO 'FieldOpsDB' TO FORCE RESET AND REBRAND
+    super('FieldOpsDB');
 
     this.version(1).stores({
       employees: 'id, name, role, phone, isActive, syncStatus, createdAt, updatedAt',
@@ -174,6 +203,26 @@ export class FarmDatabase extends Dexie {
       scouting: 'id, field_name, scout_date, severity, status, syncStatus, createdAt, updatedAt',
       attachments: 'id, entity_type, entity_id, file_name, syncStatus, createdAt, updatedAt',
       sync_conflicts: 'id, table_name, record_id, status, createdAt, updatedAt',
+    });
+
+    this.version(3).stores({
+      employees: 'id, name, role, phone, isActive, syncStatus, createdAt, updatedAt',
+      tasks: 'id, title, status, priority, assignedTo, dueDate, syncStatus, createdAt, updatedAt',
+      crops: 'id, plot_number, crop_type, status, location, planting_date, syncStatus, createdAt, updatedAt',
+      inventory: 'id, name, category, quantity, lowStockThreshold, syncStatus, createdAt, updatedAt',
+      sales: 'id, date, customer, amount, syncStatus, createdAt, updatedAt',
+      expenses: 'id, title, category, date, amount, syncStatus, createdAt, updatedAt',
+      livestock: 'id, animal_id, species, health_status, syncStatus, createdAt, updatedAt',
+      livestock_logs: 'id, livestock_id, type, date, syncStatus, createdAt, updatedAt',
+      treatments: 'id, crop_id, treatment_date, syncStatus, createdAt, updatedAt',
+      scouting: 'id, field_name, scout_date, severity, status, syncStatus, createdAt, updatedAt',
+      attachments: 'id, entity_type, entity_id, file_name, syncStatus, createdAt, updatedAt',
+      sync_conflicts: 'id, table_name, record_id, status, createdAt, updatedAt',
+      work_orders: 'id, title, status, assigned_to, crop_id, start_date, syncStatus, createdAt, updatedAt',
+      traceability_batches: 'id, batch_number, crop_id, harvest_date, syncStatus, createdAt, updatedAt',
+      plans: 'id, title, type, season, syncStatus, createdAt, updatedAt',
+    }).upgrade(() => {
+       // No data migration needed
     });
   }
 }

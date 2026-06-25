@@ -8,7 +8,7 @@ export default function ThemeToggle({ variant = "default" }: { variant?: "defaul
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => { queueMicrotask(() => setMounted(true)); }, []);
 
   if (!mounted) {
     return <div className={variant === "shell" ? "h-9 w-9" : "h-10 w-10"} aria-hidden />;
@@ -20,8 +20,20 @@ export default function ThemeToggle({ variant = "default" }: { variant?: "defaul
     else setTheme("light");
   };
 
-  const label = theme === "system" ? `System (${resolvedTheme})` : theme === "dark" ? "Dark" : "Light";
-  const Icon = theme === "dark" ? Moon : theme === "system" ? Monitor : Sun;
+  const labelMap: Record<string, string> = {
+    light: "Light",
+    dark: "Dark",
+    system: `System (${resolvedTheme})`,
+  };
+  const label = labelMap[theme ?? "system"] ?? "System";
+
+  const IconMap: Record<string, typeof Sun> = {
+    light: Sun,
+    dark: Moon,
+    system: Monitor,
+  };
+  const Icon = IconMap[theme ?? "system"] ?? Monitor;
+
   const className =
     variant === "shell"
       ? "h-9 w-9 inline-flex items-center justify-center rounded-lg border border-sidebar-border bg-sidebar-accent/50 text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer"
@@ -31,7 +43,7 @@ export default function ThemeToggle({ variant = "default" }: { variant?: "defaul
     <button
       type="button"
       onClick={cycle}
-      title={`Theme: ${label} - click to switch`}
+      title={`Theme: ${label} — click to switch`}
       aria-label={`Switch theme (current: ${label})`}
       className={className}
     >

@@ -1,33 +1,15 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/pg';
 import bcrypt from 'bcryptjs';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { ApiError, apiErrorResponse, emailValue, idValue, readJson, text } from '@/lib/api';
+import { apiErrorResponse, emailValue, idValue, logAudit, readJson, requirePermission, text } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
-
-// --- SECURITY HELPER ---
-async function getSessionInfo() {
-  const session = await getServerSession(authOptions);
-  if (!session) throw new ApiError('Forbidden', 403);
-  
-  const user = session.user as any;
-  if (user.role !== 'Admin' && !user.is_superadmin) {
-      throw new ApiError('Forbidden', 403);
-  }
-  return {
-      farm_id: user.farm_id,
-      is_superadmin: user.is_superadmin,
-      user_id: user.id
-  };
-}
 
 // 1. GET: List users
 export async function GET() {
   // ✅ OPTIMIZED: Use pool.query directly
   try {
-    const { farm_id, is_superadmin } = await getSessionInfo();
+    const { farm_id, is_superadmin } = await requirePermission('users:manage');
     
     // ✅ FIX: Ensure Super Admin query joins farms table to show Farm Name
     const query = is_superadmin
@@ -52,7 +34,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const client = await pool.connect();
   try {
-    const { farm_id, is_superadmin } = await getSessionInfo();
+    const session = await requirePermission('users:manage');
+    const { farm_id, is_superadmin } = session;
     const body = await readJson(request);
     const email = emailValue(body.email);
     const password = text(body.password, 'password', { max: 200 });
@@ -98,6 +81,7 @@ export async function POST(request: Request) {
     );
 
     await client.query('COMMIT');
+    await logAudit(session, 'user.created', 'user', result.rows[0].id, { email, farm_id: finalFarmId });
     return NextResponse.json(result.rows[0]);
   } catch (error: unknown) {
     await client.query('ROLLBACK');
@@ -110,13 +94,14 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const client = await pool.connect();
   try {
-    const { farm_id, is_superadmin } = await getSessionInfo();
+    const session = await requirePermission('users:manage');
+    const { farm_id, is_superadmin } = session;
     const body = await readJson(request);
     const id = idValue(body.id, 'user_id');
     const password = text(body.password, 'password', { required: false, max: 200 });
 
-    let query;
-    let values;
+    let query: string;
+    let values: Array<string | number | null>;
     
     const whereClause = is_superadmin ? "WHERE id = $2" : "WHERE id = $2 AND farm_id = $3";
     
@@ -138,6 +123,7 @@ export async function PUT(request: Request) {
     if (result.rows.length === 0) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
+    await logAudit(session, 'user.updated', 'user', id, { password_changed: Boolean(password) });
     return NextResponse.json(result.rows[0]);
   } catch (error: unknown) {
     return apiErrorResponse(error, 'Failed to update user');
@@ -150,7 +136,8 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   const client = await pool.connect();
   try {
-    const { farm_id, is_superadmin, user_id } = await getSessionInfo();
+    const session = await requirePermission('users:manage');
+    const { farm_id, is_superadmin, user_id } = session;
     const body = await readJson(request);
     const id = idValue(body.id, 'user_id');
 
@@ -168,6 +155,7 @@ export async function DELETE(request: Request) {
     if (res.rowCount === 0) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
+    await logAudit(session, 'user.deleted', 'user', id);
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     return apiErrorResponse(error, 'Failed to delete user');

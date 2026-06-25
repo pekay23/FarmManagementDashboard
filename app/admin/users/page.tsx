@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { DialogShell } from "@/components/ui/Dialog";
 import { Field, inputClassName } from "@/components/ui/Field";
+import { useSortableData } from "@/hooks/useSortableData";
+import { SortableHeader } from "@/components/ui/SortableHeader";
 
 type UserRow = {
   id: number;
@@ -25,6 +27,8 @@ export default function UserManagement() {
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [deletingUser, setDeletingUser] = useState<UserRow | null>(null);
   const [formError, setFormError] = useState("");
+
+  const { items: sortedUsers, requestSort, sortConfig } = useSortableData(users);
 
   const { data: session } = useSession();
   const isSuperAdmin = Boolean((session?.user as { is_superadmin?: boolean } | undefined)?.is_superadmin);
@@ -127,7 +131,7 @@ export default function UserManagement() {
   }
 
   return (
-    <div className="mx-auto min-h-screen max-w-6xl p-4 pb-20 md:p-8">
+    <div className="mx-auto min-h-screen max-w-[1600px] p-4 pb-20 md:p-8">
       <div className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-extrabold text-foreground">
@@ -160,15 +164,15 @@ export default function UserManagement() {
               <table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="border-b border-border bg-table-header text-xs uppercase text-muted-foreground">
-                    <th className="p-4 font-semibold">User / Email</th>
-                    {isSuperAdmin && <th className="p-4 font-semibold">Farm Name</th>}
-                    <th className="p-4 font-semibold">Type</th>
-                    <th className="p-4 font-semibold">Joined</th>
+                    <SortableHeader label="User / Email" sortKey="email" sortConfig={sortConfig} requestSort={requestSort} />
+                    {isSuperAdmin && <SortableHeader label="Farm Name" sortKey="farm_name" sortConfig={sortConfig} requestSort={requestSort} />}
+                    <SortableHeader label="Type" sortKey="is_superadmin" sortConfig={sortConfig} requestSort={requestSort} />
+                    <SortableHeader label="Joined" sortKey="created_at" sortConfig={sortConfig} requestSort={requestSort} />
                     <th className="p-4 text-right font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {users.map((user) => (
+                  {sortedUsers.map((user) => (
                     <UserTableRow
                       key={user.id}
                       user={user}
@@ -245,7 +249,7 @@ export default function UserManagement() {
               <Button variant="secondary" className="flex-1" onClick={() => setDeletingUser(null)}>
                 Cancel
               </Button>
-              <Button variant="destructive" className="flex-1" onClick={handleDelete}>
+              <Button variant="danger" className="flex-1" onClick={handleDelete}>
                 Delete
               </Button>
             </div>

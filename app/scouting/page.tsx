@@ -4,8 +4,10 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Loader2, Map, MapPin, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Field, inputClassName } from "@/components/ui/Field";
+import { MapSelector } from "@/components/ui/MapSelector";
 
 type ScoutingRecord = {
   id: string;
@@ -22,18 +24,13 @@ type ScoutingRecord = {
   status: "open" | "monitoring" | "resolved";
 };
 
-const severityClass: Record<ScoutingRecord["severity"], string> = {
-  low: "bg-success-soft text-success-fg border-success/20",
-  medium: "bg-warning-soft text-warning-fg border-warning/20",
-  high: "bg-destructive/10 text-destructive border-destructive/20",
-  critical: "bg-destructive text-destructive-foreground border-destructive",
-};
-
 export default function ScoutingPage() {
   const [records, setRecords] = useState<ScoutingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedLat, setSelectedLat] = useState<number | null>(null);
+  const [selectedLng, setSelectedLng] = useState<number | null>(null);
 
   async function loadRecords() {
     const response = await fetch("/api/scouting", { cache: "no-store" });
@@ -69,6 +66,8 @@ export default function ScoutingPage() {
         throw new Error(body.error || "Unable to save scouting record.");
       }
       event.currentTarget.reset();
+      setSelectedLat(null);
+      setSelectedLng(null);
       toast.success("Scouting record saved");
       await loadRecords();
     } catch (err) {
@@ -144,13 +143,18 @@ export default function ScoutingPage() {
                   </select>
                 </Field>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Latitude">
-                  <input name="latitude" type="number" step="0.000001" className={inputClassName} placeholder="5.603717" />
-                </Field>
-                <Field label="Longitude">
-                  <input name="longitude" type="number" step="0.000001" className={inputClassName} placeholder="-0.186964" />
-                </Field>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase text-muted-foreground">Location Pin</label>
+                <MapSelector
+                  latitude={selectedLat}
+                  longitude={selectedLng}
+                  onLocationSelect={(lat, lng) => {
+                    setSelectedLat(lat);
+                    setSelectedLng(lng);
+                  }}
+                />
+                <input type="hidden" name="latitude" value={selectedLat ?? ""} />
+                <input type="hidden" name="longitude" value={selectedLng ?? ""} />
               </div>
               <Field label="Notes">
                 <textarea name="notes" className={inputClassName} rows={3} placeholder="Symptoms, affected area, pest count..." />
@@ -188,9 +192,9 @@ export default function ScoutingPage() {
                         <h3 className="truncate text-sm font-extrabold text-foreground">{record.field_name}</h3>
                         <p className="mt-1 text-xs text-muted-foreground">{record.issue_type} · {new Date(record.scout_date).toLocaleDateString()}</p>
                       </div>
-                      <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase ${severityClass[record.severity]}`}>
+                      <Badge variant={record.severity === 'low' ? 'success' : record.severity === 'medium' ? 'warning' : 'danger'} className="text-[10px] uppercase font-black">
                         {record.severity}
-                      </span>
+                      </Badge>
                     </div>
                     {record.notes && <p className="mt-3 line-clamp-3 text-sm text-muted-foreground">{record.notes}</p>}
                     {(record.latitude || record.longitude) && (

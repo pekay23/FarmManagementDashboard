@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Loader2, ScrollText } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
+import { useSortableData } from "@/hooks/useSortableData";
+import { SortableHeader } from "@/components/ui/SortableHeader";
 
 type AuditLog = {
   id: number;
@@ -18,6 +20,8 @@ export default function AuditPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const { items: sortedLogs, requestSort, sortConfig } = useSortableData(logs);
 
   useEffect(() => {
     fetch("/api/audit-logs?limit=150", { cache: "no-store" })
@@ -58,14 +62,14 @@ export default function AuditPage() {
               <table className="min-w-full text-left text-sm">
                 <thead className="border-b border-border text-xs uppercase text-muted-foreground">
                   <tr>
-                    <th className="py-3 pr-4">Action</th>
-                    <th className="py-3 pr-4">Entity</th>
-                    <th className="py-3 pr-4">User</th>
-                    <th className="py-3 pr-4">Time</th>
+                    <SortableHeader label="Action" sortKey="action" sortConfig={sortConfig} requestSort={requestSort} className="py-3 pr-4" />
+                    <SortableHeader label="Entity" sortKey="entity_type" sortConfig={sortConfig} requestSort={requestSort} className="py-3 pr-4" />
+                    <SortableHeader label="User" sortKey="user_email" sortConfig={sortConfig} requestSort={requestSort} className="py-3 pr-4" />
+                    <SortableHeader label="Time" sortKey="created_at" sortConfig={sortConfig} requestSort={requestSort} className="py-3 pr-4" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {logs.map((log) => (
+                  {sortedLogs.map((log) => (
                     <tr key={log.id}>
                       <td className="py-3 pr-4 font-bold text-foreground">{log.action}</td>
                       <td className="py-3 pr-4 text-muted-foreground">{log.entity_type}{log.entity_id ? ` #${log.entity_id}` : ""}</td>

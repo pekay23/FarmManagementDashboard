@@ -5,6 +5,7 @@ import { GitMerge, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
 
 type SyncConflict = {
   id: string;
@@ -91,9 +92,9 @@ export default function SyncConflictsPage() {
                         {formatConflictTime(conflict)}
                       </p>
                     </div>
-                    <span className="w-fit rounded-full border border-border bg-card px-2 py-1 text-[10px] font-black uppercase text-muted-foreground">
-                      {conflict.status}
-                    </span>
+                      <Badge variant="secondary" className="uppercase font-black text-[10px] w-fit">
+                        {conflict.status}
+                      </Badge>
                   </div>
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
                     <pre className="max-h-52 overflow-auto rounded-lg bg-muted p-3 text-xs text-muted-foreground">

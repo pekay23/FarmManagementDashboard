@@ -32,7 +32,7 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   } finally {
     client.release();
@@ -74,7 +74,7 @@ export async function PUT(
     if (result.rows.length === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     return NextResponse.json(result.rows[0]);
-  } catch (error: any) {
+  } catch {
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   } finally {
     client.release();

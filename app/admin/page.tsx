@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Badge } from "@/components/ui/Badge";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -148,17 +149,29 @@ export default function AdminDashboardPage() {
             <Building2 className="h-5 w-5 text-muted-foreground" />
           </div>
           <div className="divide-y divide-border">
-            {(data?.allFarms ?? []).slice(0, 8).map((farm) => (
+            {(data?.allFarms ?? []).slice(0, 8).map((farm) => {
+              // Deterministic mock: derive health from farm ID char code sum
+              const idSum = farm.id.split('').reduce((s, c) => s + c.charCodeAt(0), 0);
+              const isHealthy = idSum % 5 !== 0;
+              const healthStatus = isHealthy ? "Healthy" : "Needs Review";
+              
+              return (
               <div key={farm.id} className="flex items-center justify-between gap-4 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-foreground">{farm.name}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-bold text-foreground">{farm.name}</p>
+                      <Badge variant={isHealthy ? 'success' : 'warning'} className="text-[10px] uppercase font-black tracking-wide border bg-transparent">
+                        <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${isHealthy ? 'bg-success' : 'bg-warning'}`}></span>
+                        {healthStatus}
+                      </Badge>
+                  </div>
                   <p className="truncate text-xs text-muted-foreground">Farm ID {farm.id}</p>
                 </div>
                 <Link href={`/admin/users`} className="text-xs font-bold text-primary hover:underline">
-                  View owner
+                  View details
                 </Link>
               </div>
-            ))}
+            )})}
             {totalFarms === 0 && <p className="py-10 text-center text-sm text-muted-foreground">No farms have been created yet.</p>}
           </div>
         </section>

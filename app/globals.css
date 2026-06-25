@@ -68,15 +68,15 @@
 }
 
 .dark {
-  --background: #050b12;
+  --background: #090e0b;
   --foreground: #f4f7f4;
-  --card: #0f172a;
+  --card: #121814;
   --card-foreground: #f4f7f4;
-  --popover: #0f172a;
+  --popover: #121814;
   --popover-foreground: #f4f7f4;
   --primary: var(--brand-400);
   --primary-foreground: #03241b;
-  --secondary: #172033;
+  --secondary: #19241e;
   --secondary-foreground: #f4f7f4;
   --muted: #14201c;
   --muted-foreground: #9aa99d;
@@ -88,19 +88,19 @@
   --input: rgba(255, 255, 255, 0.11);
   --ring: var(--brand-300);
 
-  --sidebar: #050b12;
+  --sidebar: #090e0b;
   --sidebar-from: var(--sidebar);
   --sidebar-to: var(--sidebar);
   --sidebar-foreground: #f4f7f4;
   --sidebar-muted: #9aa99d;
-  --sidebar-accent: #101a25;
+  --sidebar-accent: #121814;
   --sidebar-accent-fg: #f4f7f4;
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --surface-raised: #0f172a;
-  --surface-inset: #0a111d;
-  --table-header: #111b2d;
+  --surface-raised: #121814;
+  --surface-inset: #050806;
+  --table-header: #0e1411;
   --table-row-hover: rgba(255, 255, 255, 0.035);
-  --table-selected: rgba(96, 165, 250, 0.16);
+  --table-selected: rgba(16, 185, 129, 0.16);
   --overlay: rgba(0, 0, 0, 0.72);
 
   --chart-1: #2dd4bf;
@@ -121,6 +121,8 @@
   --info-soft: rgba(37, 99, 235, 0.15);
   --info-fg: #93c5fd;
 }
+
+
 
 @theme inline {
   --color-brand-50: var(--brand-50);
@@ -447,6 +449,8 @@ textarea::placeholder {
   .dark .shadow-primary-200 {
     --tw-shadow-color: rgba(0, 0, 0, 0.35);
   }
+
+
 }
 
 :focus-visible {
@@ -472,5 +476,11 @@ textarea::placeholder {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
   }
 }

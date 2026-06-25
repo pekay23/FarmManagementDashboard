@@ -6,13 +6,13 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from 'next-auth/react';
 import SyncStatus from "@/components/SyncStatus";
 import ThemeToggle from "@/components/ThemeToggle";
-import { logoBase64 } from "@/lib/logo";
-import Image from "next/image";
+
 import {
   Menu, X, Home, Tractor, Settings, Beef, Package,
   Users, ClipboardList, DollarSign, BarChart3, TrendingDown,
-  Shield, LogOut, LayoutDashboard
+  Shield, LogOut, LayoutDashboard, Wrench, QrCode, Calendar
 } from "lucide-react";
+import { FarmSwitcher } from "@/components/FarmSwitcher";
 
 // ✅ LINKS FOR REGULAR FARM USERS
 const farmLinks = [
@@ -22,6 +22,9 @@ const farmLinks = [
   { name: "Inventory", href: "/inventory", icon: Package },
   { name: "Employees", href: "/employees", icon: Users },
   { name: "Tasks", href: "/tasks", icon: ClipboardList },
+  { name: "Work Orders", href: "/work-orders", icon: Wrench },
+  { name: "Traceability", href: "/traceability", icon: QrCode },
+  { name: "Planning", href: "/planning", icon: Calendar },
   { name: "Expenses", href: "/expenses", icon: TrendingDown },
   { name: "Sales", href: "/sales", icon: DollarSign },
   { name: "Reports", href: "/reports", icon: BarChart3 },
@@ -43,7 +46,7 @@ export default function Sidebar() {
   const isSuperAdmin = (session?.user as { is_superadmin?: boolean } | undefined)?.is_superadmin;
   const links = isSuperAdmin ? superAdminLinks : farmLinks;
 
-  const [brand, setBrand] = useState({ name: 'FieldOps', logo: '' });
+  const [brand, setBrand] = useState({ name: 'FieldOps', logo: '/logo.png' });
 
   useEffect(() => {
       // Only fetch custom branding for regular farm users
@@ -54,7 +57,7 @@ export default function Sidebar() {
               if (data.farm_name) {
                   setBrand({
                       name: data.farm_name,
-                      logo: data.logo || ''
+                      logo: data.logo || '/logo.png'
                   });
               }
           })
@@ -62,7 +65,7 @@ export default function Sidebar() {
       } else if (isSuperAdmin) {
           // Super Admins see the default app branding
           // eslint-disable-next-line react-hooks/set-state-in-effect -- derived from session change
-          setBrand({ name: 'Platform Admin', logo: logoBase64 });
+          setBrand({ name: 'Platform Admin', logo: '/logo.png' });
       }
   }, [session, isSuperAdmin]);
 
@@ -80,7 +83,8 @@ export default function Sidebar() {
       <div className="md:hidden fixed top-0 left-0 w-full bg-emerald-900 z-50 p-4 border-b border-white/10 flex justify-between items-center text-white shadow-md">
         <div className="flex items-center gap-3">
             {brand.logo ? (
-                <Image src={brand.logo} alt="Logo" width={32} height={32} className="w-8 h-8 object-contain drop-shadow-md" unoptimized />
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={brand.logo} alt="Logo" className="w-8 h-8 object-contain drop-shadow-md" />
             ) : (
                 <span className="text-2xl">🚜</span>
             )}
@@ -98,7 +102,8 @@ export default function Sidebar() {
         <div className="flex items-center gap-3 px-6 py-6 border-b border-white/10 bg-black/10">
            <div className="bg-white/10 p-2 rounded-xl backdrop-blur-sm shadow-sm border border-white/5">
              {brand.logo ? (
-                 <Image src={brand.logo} width={40} height={40} className="w-10 h-10 object-contain drop-shadow-md" alt="Farm Logo" unoptimized />
+                 /* eslint-disable-next-line @next/next/no-img-element */
+                 <img src={brand.logo} className="w-10 h-10 object-contain drop-shadow-md" alt="Farm Logo" />
              ) : (
                  <div className="w-10 h-10 flex items-center justify-center text-2xl">🚜</div>
              )}
@@ -136,13 +141,18 @@ export default function Sidebar() {
           })}
         </nav>
 
-        <div className="p-3 border-t border-sidebar-border">
-          <div className="flex items-center justify-between mb-2 px-1">
+        <div className="p-3 border-t border-sidebar-border space-y-3">
+          <div className="flex items-center justify-between px-1">
             <ThemeToggle />
           </div>
+          
+          <div className="px-1">
+            <FarmSwitcher />
+          </div>
+
           <button
             onClick={() => signOut({ redirect: true, callbackUrl: '/login' })}
-            className="flex w-full items-center space-x-3 px-4 py-3 text-sm font-semibold rounded-lg text-red-300 hover:bg-red-900/30 hover:text-red-200 transition-all duration-200 mb-2"
+            className="flex w-full items-center space-x-3 px-4 py-3 text-sm font-semibold rounded-lg text-red-300 hover:bg-red-900/30 hover:text-red-200 transition-all duration-200"
           >
             <LogOut className="w-5 h-5 shrink-0" />
             <span>Sign Out</span>

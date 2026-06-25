@@ -32,7 +32,7 @@ export default function Profile() {
             const data = await res.json();
             setMsg({ type: 'error', text: data.error || 'Failed to update' });
         }
-    } catch (err) {
+    } catch {
         setMsg({ type: 'error', text: 'Network error occurred' });
     } finally {
         setLoading(false);
@@ -40,11 +40,11 @@ export default function Profile() {
   }
 
   return (
-    <div className="p-8 max-w-lg mx-auto min-h-screen">
-      <h1 className="text-2xl font-bold mb-6 text-gray-900">My Profile</h1>
+    <div className="p-8 max-w-[1600px] mx-auto min-h-screen">
+      <h1 className="text-2xl font-bold mb-6 text-card-foreground">My Profile</h1>
       
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+      <div className="bg-card p-6 rounded-xl shadow-sm border border-border">
+        <h3 className="font-bold text-card-foreground mb-4 flex items-center gap-2">
             <Lock className="w-4 h-4 text-primary-600"/> Security Settings
         </h3>
 
@@ -59,12 +59,12 @@ export default function Profile() {
 
         <form onSubmit={handleUpdate} className="space-y-4">
             <div>
-                <label className="text-xs text-gray-500 font-bold uppercase ml-1">New Password</label>
+                <label className="text-xs text-muted-foreground font-bold uppercase ml-1">New Password</label>
                 <input 
                     type="password" 
                     required 
                     placeholder="••••••••" 
-                    className="w-full border border-gray-200 p-3 rounded-lg outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all mt-1"
+                    className="w-full border border-border p-3 rounded-lg outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all mt-1"
                     value={pass}
                     onChange={e => setPass(e.target.value)}
                 />

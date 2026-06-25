@@ -35,7 +35,6 @@ import {
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import SyncStatus from "@/components/SyncStatus";
-import { logoBase64 } from "@/lib/logo";
 
 const farmSections = [
   {
@@ -111,7 +110,7 @@ function useBrand(portalMode: PortalMode) {
     if (!session) return;
 
     if (portalMode === "admin") {
-      setBrand({ name: "FieldOps Admin", logo: logoBase64 });
+      queueMicrotask(() => setBrand({ name: "FieldOps Admin", logo: "" }));
       return;
     }
 
@@ -213,7 +212,7 @@ function SidebarContent({
         {sections.map((section, sectionIndex) => (
           <div key={section.label} className={sectionIndex === 0 ? "" : "mt-8"}>
             {!collapsed && (
-              <p className="mb-2.5 px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-sidebar-foreground/40">
+              <p className="mb-2.5 px-3 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/40">
                 {section.label}
               </p>
             )}
@@ -318,7 +317,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const saved = window.localStorage.getItem("farm-shell-collapsed");
-    if (saved) setCollapsed(saved === "true");
+    queueMicrotask(() => { if (saved) setCollapsed(saved === "true"); });
   }, []);
 
   const today = useMemo(

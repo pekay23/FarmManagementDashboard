@@ -5,9 +5,19 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { toast } from 'sonner';
 import { 
-  Package, AlertTriangle, TrendingDown, Plus, Search, 
-  X, Loader2, Pencil, Trash2, CheckCircle 
+  Package, AlertTriangle, TrendingDown, Plus, 
+  Loader2, Pencil, Trash2 
 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Modal } from '@/components/ui/Modal';
+import { Badge } from '@/components/ui/Badge';
+import { useSortableData } from '@/hooks/useSortableData';
+import { SortableHeader } from '@/components/ui/SortableHeader';
 
 // ✅ SAFE UUID GENERATOR
 function generateUUID() {
@@ -39,7 +49,7 @@ export default function Inventory() {
   async function handleSubmit(e: any) {
     e.preventDefault();
     const formData = {
-        name: e.target.name.value,
+        name: e.target.itemName.value,
         category: e.target.category.value,
         quantity: parseFloat(e.target.quantity.value),
         unit: e.target.unit.value,
@@ -63,8 +73,7 @@ export default function Inventory() {
             toast.success("Item added");
         }
         setIsModalOpen(false);
-    } catch (err) {
-        console.error(err);
+    } catch {
         toast.error("Failed to save item");
     }
   }
@@ -80,7 +89,7 @@ export default function Inventory() {
             await db.inventory.update(confirmDelete.id, { syncStatus: 'deleted', updatedAt: new Date().toISOString() });
         }
         toast.success("Item deleted");
-    } catch (err) {
+    } catch {
         toast.error("Delete failed");
     } finally {
         setConfirmDelete(null);
@@ -95,25 +104,23 @@ export default function Inventory() {
     return item.category === activeCategory;
   });
 
+  const { items: sortedItems, requestSort, sortConfig } = useSortableData(filteredItems);
+
   const lowStockCount = items.filter(i => i.quantity <= i.lowStockThreshold).length;
   const totalValue = items.reduce((acc, item) => acc + (item.quantity * (item.unitPrice || 0)), 0);
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto relative pb-20">
+    <div className="p-4 md:p-8 max-w-[1600px] mx-auto relative pb-20">
       
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
-          <p className="text-gray-500">Track your farm supplies and materials</p>
-        </div>
-        <button 
-          onClick={() => { setEditingItem(null); setIsModalOpen(true); }}
-          className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors w-full md:w-auto"
-        >
-          <Plus className="w-5 h-5" />
-          Add Item
-        </button>
-      </div>
+      <PageHeader 
+        title="Inventory Management" 
+        description="Track your farm supplies and materials"
+        actions={
+          <Button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="w-full md:w-auto">
+            <Plus className="w-4 h-4 mr-2" /> Add Item
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <InventoryKpi title="Total Items" value={items.length.toString()} icon={Package} color="blue" />
@@ -121,14 +128,14 @@ export default function Inventory() {
         <InventoryKpi title="Total Value" value={`GH₵ ${totalValue.toLocaleString()}`} icon={TrendingDown} color="green" />
       </div>
 
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-col md:flex-row justify-between gap-4">
+      <div className="bg-card p-4 rounded-xl shadow-sm border border-border mb-6 flex flex-col md:flex-row justify-between gap-4">
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 md:pb-0">
           {categories.map(cat => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
               className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors
-                ${activeCategory === cat ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                ${activeCategory === cat ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'}`}
             >
               {cat}
             </button>
@@ -136,153 +143,178 @@ export default function Inventory() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {!items ? (
-            <div className="p-10 flex justify-center text-gray-400"><Loader2 className="w-8 h-8 animate-spin" /></div>
-        ) : items.length === 0 ? (
-            <div className="p-10 text-center text-gray-400">No inventory items found.</div>
-        ) : (
-            <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-                <thead>
-                <tr className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 tracking-wider">
-                    <th className="p-4 font-semibold">Item Name</th>
-                    <th className="p-4 font-semibold">Category</th>
-                    <th className="p-4 font-semibold">Quantity</th>
-                    <th className="p-4 font-semibold">Min Threshold</th>
-                    <th className="p-4 font-semibold">Unit Price</th>
-                    <th className="p-4 font-semibold">Total Value</th>
-                    <th className="p-4 font-semibold">Status</th>
-                    <th className="p-4 font-semibold text-right">Actions</th>
-                </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                {filteredItems.map((item: any) => {
-                    const isLow = item.quantity <= item.lowStockThreshold;
-                    const val = item.quantity * (item.unitPrice || 0);
-                    
-                    return (
-                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="p-4">
-                        <div className="font-medium text-gray-900">{item.name}</div>
-                        <div className="text-xs text-gray-500">{item.supplier || 'No Supplier'}</div>
-                        </td>
-                        <td className="p-4"><span className="px-2 py-1 bg-gray-100 rounded-md text-xs">{item.category}</span></td>
-                        <td className="p-4 font-medium">{item.quantity} {item.unit}</td>
-                        <td className="p-4 text-gray-500 text-sm">{item.lowStockThreshold} {item.unit}</td>
-                        <td className="p-4 text-gray-600">GH₵ {(item.unitPrice || 0).toFixed(2)}</td>
-                        <td className="p-4 font-bold text-gray-800">GH₵ {val.toFixed(2)}</td>
-                        <td className="p-4">
-                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${isLow ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                                {isLow ? 'Low Stock' : 'In Stock'}
-                            </span>
-                        </td>
-                        <td className="p-4 text-right flex justify-end gap-2">
-                            <button onClick={() => { setEditingItem(item); setIsModalOpen(true); }} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 hover:text-primary-600 transition-colors">
-                                <Pencil className="w-4 h-4" />
-                            </button>
-                            {/* ✅ OPEN DELETE MODAL INSTEAD OF WINDOW.CONFIRM */}
-                            <button onClick={() => setConfirmDelete(item)} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 hover:text-red-600 transition-colors">
-                                <Trash2 className="w-4 h-4" />
-                            </button>
-                        </td>
-                    </tr>
-                    );
-                })}
-                </tbody>
-            </table>
+      {!items ? (
+          <div className="p-10 flex justify-center text-muted-foreground"><Loader2 className="w-8 h-8 animate-spin" /></div>
+      ) : items.length === 0 ? (
+          <EmptyState 
+            icon={<Package className="w-12 h-12" />} 
+            title="No inventory items" 
+            description="You don't have any inventory items yet. Add one to get started." 
+            actionLabel="Add Item"
+            onAction={() => { setEditingItem(null); setIsModalOpen(true); }}
+          />
+      ) : (
+          <>
+            {/* Desktop View */}
+            <Card className="hidden md:block overflow-hidden">
+              <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                  <thead>
+                  <tr className="bg-muted border-b border-border text-xs uppercase text-muted-foreground tracking-wider">
+                      <SortableHeader label="Item Name" sortKey="name" sortConfig={sortConfig} requestSort={requestSort} />
+                      <SortableHeader label="Category" sortKey="category" sortConfig={sortConfig} requestSort={requestSort} />
+                      <SortableHeader label="Quantity" sortKey="quantity" sortConfig={sortConfig} requestSort={requestSort} />
+                      <SortableHeader label="Min Threshold" sortKey="lowStockThreshold" sortConfig={sortConfig} requestSort={requestSort} />
+                      <SortableHeader label="Unit Price" sortKey="unitPrice" sortConfig={sortConfig} requestSort={requestSort} />
+                      <th className="p-4 font-semibold">Total Value</th>
+                      <th className="p-4 font-semibold">Status</th>
+                      <th className="p-4 font-semibold text-right">Actions</th>
+                  </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                  {sortedItems.map((item: any) => {
+                      const isLow = item.quantity <= item.lowStockThreshold;
+                      const val = item.quantity * (item.unitPrice || 0);
+                      
+                      return (
+                      <tr key={item.id} className="hover:bg-muted transition-colors">
+                          <td className="p-4">
+                          <div className="font-medium text-card-foreground">{item.name}</div>
+                          <div className="text-xs text-muted-foreground">{item.supplier || 'No Supplier'}</div>
+                          </td>
+                          <td className="p-4"><span className="px-2 py-1 bg-secondary rounded-md text-xs">{item.category}</span></td>
+                          <td className="p-4 font-medium">{item.quantity} {item.unit}</td>
+                          <td className="p-4 text-muted-foreground text-sm">{item.lowStockThreshold} {item.unit}</td>
+                          <td className="p-4 text-muted-foreground dark:text-muted-foreground">GH₵ {(item.unitPrice || 0).toFixed(2)}</td>
+                          <td className="p-4 font-bold text-card-foreground">GH₵ {val.toFixed(2)}</td>
+                          <td className="p-4">
+                              <Badge variant={isLow ? 'danger' : 'success'}>
+                                  {isLow ? 'Low Stock' : 'In Stock'}
+                              </Badge>
+                          </td>
+                          <td className="p-4 text-right flex justify-end gap-2">
+                              <Button variant="ghost" size="icon" onClick={() => { setEditingItem(item); setIsModalOpen(true); }}>
+                                  <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="hover:text-red-600" onClick={() => setConfirmDelete(item)}>
+                                  <Trash2 className="w-4 h-4 text-red-500" />
+                              </Button>
+                          </td>
+                      </tr>
+                      );
+                  })}
+                  </tbody>
+              </table>
+              </div>
+            </Card>
+
+            {/* Mobile View */}
+            <div className="grid grid-cols-1 gap-4 md:hidden">
+              {filteredItems.map((item: any) => {
+                const isLow = item.quantity <= item.lowStockThreshold;
+                const val = item.quantity * (item.unitPrice || 0);
+                
+                return (
+                  <Card key={item.id}>
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h3 className="font-medium text-card-foreground">{item.name}</h3>
+                          <p className="text-xs text-muted-foreground">{item.supplier || 'No Supplier'}</p>
+                        </div>
+                        <Badge variant={isLow ? 'danger' : 'success'}>
+                            {isLow ? 'Low Stock' : 'In Stock'}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-y-2 text-sm mb-4">
+                        <div className="text-muted-foreground">Category:</div>
+                        <div className="text-right">{item.category}</div>
+                        <div className="text-muted-foreground">Quantity:</div>
+                        <div className="text-right font-medium">{item.quantity} {item.unit}</div>
+                        <div className="text-muted-foreground">Value:</div>
+                        <div className="text-right font-bold text-card-foreground">GH₵ {val.toFixed(2)}</div>
+                      </div>
+                      <div className="flex justify-end gap-2 border-t pt-3">
+                        <Button variant="secondary" size="sm" onClick={() => { setEditingItem(item); setIsModalOpen(true); }}>
+                            Edit
+                        </Button>
+                        <Button variant="danger" size="sm" onClick={() => setConfirmDelete(item)}>
+                            Delete
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
-        )}
-      </div>
+          </>
+      )}
 
       {/* ✅ DELETE CONFIRMATION MODAL */}
-      {confirmDelete && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-xl w-full max-w-sm p-6 shadow-2xl text-center animate-in zoom-in-95">
-                <div className="bg-red-50 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                    <AlertTriangle className="w-8 h-8 text-red-500"/>
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Item?</h3>
-                <p className="text-gray-500 text-sm mb-6">
-                    Are you sure you want to delete <strong>{confirmDelete.name}</strong>? This action cannot be undone.
-                </p>
-                <div className="flex gap-3">
-                    <button onClick={() => setConfirmDelete(null)} className="flex-1 py-2.5 bg-gray-100 rounded-lg font-bold text-gray-600 hover:bg-gray-200">Cancel</button>
-                    <button onClick={handleDelete} className="flex-1 py-2.5 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700">Delete</button>
-                </div>
-            </div>
-        </div>
-      )}
-
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-800">{editingItem ? 'Edit Item' : 'Add New Item'}</h2>
-              <button onClick={() => setIsModalOpen(false)}><X className="text-gray-400 hover:text-gray-600" /></button>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
-                <input name="name" required type="text" defaultValue={editingItem?.name} className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-primary-500" />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <select name="category" defaultValue={editingItem?.category || 'Seeds'} className="w-full border border-gray-300 rounded-lg p-2.5 bg-white outline-none focus:border-primary-500">
-                  <option>Seeds</option>
-                  <option>Fertilizers</option>
-                  <option>Pesticides</option>
-                  <option>Feeds</option>
-                  <option>Medicines</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                  <input name="quantity" required type="number" defaultValue={editingItem?.quantity} className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-primary-500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                  <input name="unit" required type="text" placeholder="kg" defaultValue={editingItem?.unit} className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-primary-500" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Threshold</label>
-                  <input name="threshold" required type="number" defaultValue={editingItem?.lowStockThreshold || 10} className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-primary-500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Price (GH₵)</label>
-                  <input name="price" required type="number" step="0.01" defaultValue={editingItem?.unitPrice} className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-primary-500" />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
-                <input name="supplier" type="text" defaultValue={editingItem?.supplier} className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-primary-500" />
-              </div>
-
-              <button type="submit" className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-lg font-bold transition-colors flex justify-center">
-                {editingItem ? 'Update Item' : 'Save Item'}
-              </button>
-            </form>
+      <Modal isOpen={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="Delete Item?">
+        <div className="text-center pb-6">
+          <div className="bg-red-50 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-8 h-8 text-red-500"/>
+          </div>
+          <p className="text-muted-foreground dark:text-muted-foreground text-sm mb-6">
+              Are you sure you want to delete <strong>{confirmDelete?.name}</strong>? This action cannot be undone.
+          </p>
+          <div className="flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={() => setConfirmDelete(null)}>Cancel</Button>
+              <Button variant="danger" className="flex-1" onClick={handleDelete}>Delete</Button>
           </div>
         </div>
-      )}
+      </Modal>
+
+      {/* ✅ ADD/EDIT MODAL */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingItem ? 'Edit Item' : 'Add New Item'}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input name="itemName" label="Item Name" required defaultValue={editingItem?.name} />
+          
+          <Select name="category" label="Category" defaultValue={editingItem?.category || 'Seeds'}>
+            <option>Seeds</option>
+            <option>Fertilizers</option>
+            <option>Pesticides</option>
+            <option>Feeds</option>
+            <option>Medicines</option>
+          </Select>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input name="quantity" label="Quantity" required type="number" defaultValue={editingItem?.quantity} />
+            <Input name="unit" label="Unit" required placeholder="kg" defaultValue={editingItem?.unit} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input name="threshold" label="Threshold" required type="number" defaultValue={editingItem?.lowStockThreshold || 10} />
+            <Input name="price" label="Price (GH₵)" required type="number" step="0.01" defaultValue={editingItem?.unitPrice} />
+          </div>
+
+          <Input name="supplier" label="Supplier" defaultValue={editingItem?.supplier} />
+
+          <Button type="submit" className="w-full">
+            {editingItem ? 'Update Item' : 'Save Item'}
+          </Button>
+        </form>
+      </Modal>
     </div>
   );
 }
 
 function InventoryKpi({ title, value, icon: Icon, color }: any) {
-  const colors: any = { blue: "bg-blue-50 text-blue-600", red: "bg-red-50 text-red-600", green: "bg-green-50 text-green-600" };
+  const colors: any = { 
+    blue: "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400", 
+    red: "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400", 
+    green: "bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400" 
+  };
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-      <div className={`p-3 rounded-lg ${colors[color]}`}><Icon className="w-6 h-6" /></div>
-      <div><p className="text-sm text-gray-500 font-medium">{title}</p><h3 className="text-2xl font-bold text-gray-900">{value}</h3></div>
-    </div>
+    <Card className="flex items-center gap-4 border-none">
+      <CardContent className="p-6 flex items-center gap-4 w-full">
+        <div className={`p-3 rounded-lg ${colors[color]}`}><Icon className="w-6 h-6" /></div>
+        <div>
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground font-medium">{title}</p>
+          <h3 className="text-2xl font-bold text-card-foreground">{value}</h3>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

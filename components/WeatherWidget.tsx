@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CloudRain, Sun, Cloud, Wind, Droplets, MapPin, Loader2, RefreshCw } from 'lucide-react';
+import { CloudRain, Sun, Cloud, Wind, Droplets, MapPin, RefreshCw } from 'lucide-react';
 
 export default function WeatherWidget() {
   const [weather, setWeather] = useState<any>(null);
@@ -14,6 +14,7 @@ export default function WeatherWidget() {
 
   useEffect(() => {
     initWeather();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function initWeather() {
@@ -30,7 +31,7 @@ export default function WeatherWidget() {
             setLoading(false);
             return;
         }
-      } catch (e) {}
+      } catch {}
     }
 
     // 2. Determine Location
@@ -47,12 +48,12 @@ export default function WeatherWidget() {
                 const geoRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
                 const geoData = await geoRes.json();
                 city = geoData.city || geoData.locality || geoData.principalSubdivision || "Current Location";
-            } catch (e) {
+            } catch {
                 console.warn("Could not determine city name");
             }
             await fetchWeather(latitude, longitude, city);
         },
-        async (err) => {
+        async () => {
             console.warn("GPS denied/failed. Using IP fallback.");
             await fallbackToIPLocation();
         },
@@ -69,7 +70,7 @@ export default function WeatherWidget() {
           } else {
               throw new Error("IP failed");
           }
-      } catch (e) {
+      } catch {
           await fetchWeather(DEFAULT_LAT, DEFAULT_LON, "Accra (Default)");
       }
   }
@@ -102,8 +103,27 @@ export default function WeatherWidget() {
   }
 
   if (loading && !weather) return (
-    <div className="h-[220px] bg-teal-900/50 rounded-xl animate-pulse border border-teal-800 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-teal-500 animate-spin" />
+    <div className="h-[220px] bg-linear-to-br from-teal-800 to-teal-950 rounded-xl p-5 flex flex-col justify-between overflow-hidden">
+      {/* Skeleton header */}
+      <div className="space-y-3">
+        <div className="flex justify-between items-start">
+          <div className="space-y-2">
+            <div className="h-3.5 w-28 rounded bg-white/10 animate-pulse" />
+            <div className="h-10 w-20 rounded bg-white/15 animate-pulse" />
+            <div className="h-3 w-16 rounded bg-white/10 animate-pulse" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <div className="h-8 w-20 rounded-lg bg-white/10 animate-pulse" />
+            <div className="h-8 w-20 rounded-lg bg-white/10 animate-pulse" />
+          </div>
+        </div>
+      </div>
+      {/* Skeleton forecast */}
+      <div className="grid grid-cols-3 gap-2 mt-2">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="h-16 rounded-lg bg-white/10 animate-pulse" />
+        ))}
+      </div>
     </div>
   );
   
@@ -120,7 +140,7 @@ export default function WeatherWidget() {
 
   return (
     // Updated background to darker teal gradient
-    <div className="bg-gradient-to-br from-teal-800 to-teal-950 rounded-xl p-5 text-white shadow-lg relative overflow-hidden min-h-[220px] flex flex-col justify-between group">
+    <div className="bg-linear-to-br from-teal-800 to-teal-950 rounded-xl p-5 text-white shadow-lg relative overflow-hidden min-h-[220px] flex flex-col justify-between group">
       
       {/* Background Icon */}
       <div className="absolute -right-4 -top-4 opacity-10 pointer-events-none transition-transform group-hover:scale-110 duration-700">
@@ -142,7 +162,7 @@ export default function WeatherWidget() {
                 </p>
             </div>
             
-            <div className="flex flex-col gap-1.5 text-right">
+            <div className="flex flex-col gap-1.5 text-right mr-12">
                 <div className="bg-black/20 backdrop-blur-md rounded-lg px-2.5 py-1.5 flex items-center gap-2 text-xs font-medium text-teal-50">
                     <Droplets className="w-3.5 h-3.5 text-teal-300" /> 
                     {current.relative_humidity_2m}%
@@ -177,7 +197,7 @@ export default function WeatherWidget() {
       
       <button 
         onClick={initWeather} 
-        className="absolute top-3 right-3 p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors opacity-0 group-hover:opacity-100"
+        className="absolute top-3 right-3 p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors opacity-0 group-hover:opacity-100 z-20"
         title="Refresh Weather"
       >
         <RefreshCw className={`w-3.5 h-3.5 text-white ${loading ? 'animate-spin' : ''}`} />

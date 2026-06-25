@@ -11,8 +11,16 @@ import {
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { logoBase64 } from '@/lib/logo';
-import { addSvgToPdf } from '@/lib/pdfUtils'; 
+import { 
+  renderHeader, 
+  renderFooters, 
+  TABLE_HEAD_STYLES, 
+  TABLE_STYLES, 
+  TABLE_ALT_ROW_STYLES,
+  getFarmLogo,
+  fetchBase64Image,
+  renderBarChart
+} from '@/lib/pdfTemplate'; 
 import { db } from '@/lib/db'; // Local DB
 import { toast } from 'sonner';
 
@@ -24,10 +32,6 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [reportType, setReportType] = useState('overview'); 
   const [period, setPeriod] = useState('month'); 
-
-  useEffect(() => {
-    generateLocalReport();
-  }, [reportType, period]);
 
   // --- LOCAL ANALYTICS ENGINE ---
   async function generateLocalReport() {
@@ -51,9 +55,8 @@ export default function Reports() {
 
       // --- 1. OVERVIEW ---
       if (reportType === 'overview') {
-        const [crops, animals, sales, tasks, expenses] = await Promise.all([
+        const [crops, sales, tasks, expenses] = await Promise.all([
             db.crops.filter(notDeleted).toArray(),
-            db.livestock.filter(notDeleted).toArray(),
             db.sales.where('date').above(startDate.toISOString()).filter(notDeleted).toArray(),
             db.tasks.filter(notDeleted).toArray(),
             db.expenses.where('date').above(startDate.toISOString()).filter(notDeleted).toArray()
@@ -250,54 +253,87 @@ export default function Reports() {
     }
   }
 
+  useEffect(() => {
+    queueMicrotask(() => generateLocalReport());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportType, period]);
+
   const handleTypeChange = (e: any) => { setReportType(e.target.value); setData(null); };
   const handlePeriodChange = (e: any) => { setPeriod(e.target.value); setData(null); };
 
   async function generatePDF() {
     if (!data) return;
     const doc = new jsPDF();
-    const primaryEmerald: [number, number, number] = [6, 78, 59];
     
-    // 1. Executive Header
-    doc.setFillColor(primaryEmerald[0], primaryEmerald[1], primaryEmerald[2]);
-    doc.rect(0, 0, 210, 40, 'F');
-    
-    if (logoBase64) {
-      const svgString = atob(logoBase64.split(',')[1]);
-      await addSvgToPdf(doc, svgString, 15, 5, 25, 25);
-    }
+    const userLogo = getFarmLogo();
+    const logoToUse = userLogo || await fetchBase64Image('/logo.png');
 
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
-    doc.setFont("helvetica", "bold");
-    doc.text(`${reportType.toUpperCase()} PERFORMANCE REPORT`, 50, 20);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Generated on: ${new Date().toLocaleString()} | Period: ${period.toUpperCase()}`, 50, 28);
+    // Fetch live farm settings
+    let farmName = 'FieldOps Farm';
+    let settingsData: any = {};
+    try {
+        const res = await fetch('/api/settings');
+        if (res.ok) {
+            settingsData = await res.json();
+            if (settingsData.farm_name) farmName = settingsData.farm_name;
+        }
+    } catch {}
 
-    // 2. Clear KPI Table
-    const kpiRows = Object.entries(data.kpi).map(([key, val]: any) => [
-        key.replace(/_/g, ' ').toUpperCase(), 
-        typeof val === 'number' ? val.toLocaleString() : val
-    ]);
-
-    autoTable(doc, { 
-        startY: 50, 
-        head: [['PERFORMANCE METRIC', 'VALUE']], 
-        body: kpiRows,
-        headStyles: { fillColor: primaryEmerald, fontStyle: 'bold' },
-        styles: { cellPadding: 4, fontSize: 10 },
-        alternateRowStyles: { fillColor: [245, 255, 250] } 
+    const y = renderHeader({
+      doc,
+      title: `${reportType.toUpperCase()} REPORT`,
+      subtitle: `Period: ${period.toUpperCase()}`,
+      dateStr: new Date().toLocaleDateString(),
+      logoData: logoToUse,
+      farmName: farmName,
+      settingsData: settingsData
     });
 
-    // 3. Footer
-    const pageCount = (doc as any).internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text(`Page ${i} of ${pageCount} - FieldOps Farm Report`, 105, 290, { align: "center" });
+    // 2. Clear KPI Table with precise units
+    const kpiRows = Object.entries(data.kpi).map(([key, val]: any) => {
+        let displayVal = typeof val === 'number' ? val.toLocaleString() : val;
+        // Append explicit units based on key context
+        if (['net_profit', 'sales', 'expenses', 'total_revenue', 'avg_ticket', 'total_expenses', 'avg_expense', 'valuation'].includes(key)) {
+            displayVal = `GHS ${displayVal}`;
+        } else if (['completion_rate'].includes(key)) {
+            displayVal = `${displayVal}%`;
+        }
+        return [key.replace(/_/g, ' ').toUpperCase(), displayVal];
+    });
+
+    autoTable(doc, { 
+        startY: y + 10, 
+        head: [['PERFORMANCE METRIC', 'VALUE']], 
+        body: kpiRows,
+        theme: 'grid',
+        headStyles: TABLE_HEAD_STYLES,
+        styles: TABLE_STYLES,
+        alternateRowStyles: TABLE_ALT_ROW_STYLES 
+    });
+
+    let currentY = (doc as any).lastAutoTable.finalY + 20;
+
+    // 3. Render Native Charts
+    if (data.charts) {
+        if (reportType === 'overview' && data.charts.salesTrend) {
+            currentY = renderBarChart({ doc, title: 'Sales Trend (Last 7 Days)', data: data.charts.salesTrend, startY: currentY, unit: 'GHS ' });
+        } else if (reportType === 'sales' && data.charts.topItems) {
+            currentY = renderBarChart({ doc, title: 'Top Customers/Items', data: data.charts.topItems, startY: currentY, unit: 'GHS ' });
+        } else if (reportType === 'expenses' && data.charts.categoryDist) {
+            currentY = renderBarChart({ doc, title: 'Expenses by Category', data: data.charts.categoryDist, startY: currentY, unit: 'GHS ' });
+        } else if (reportType === 'inventory' && data.charts.stockLevels) {
+            currentY = renderBarChart({ doc, title: 'Top 10 Stock Levels', data: data.charts.stockLevels, startY: currentY, unit: 'Units' });
+        } else if (reportType === 'livestock' && data.charts.speciesDist) {
+            currentY = renderBarChart({ doc, title: 'Species Distribution', data: data.charts.speciesDist, startY: currentY, unit: 'Heads' });
+        } else if (reportType === 'crops' && data.charts.landUsage) {
+            currentY = renderBarChart({ doc, title: 'Land Usage (Acres)', data: data.charts.landUsage, startY: currentY, unit: 'Acres' });
+        } else if (reportType === 'crops' && data.charts.yields) {
+            renderBarChart({ doc, title: 'Crop Yields (kg)', data: data.charts.yields, startY: currentY, unit: 'kg' });
+        }
     }
+
+    // 3. Footer
+    renderFooters({ doc });
 
     doc.save(`FieldOps_${reportType}_${Date.now()}.pdf`);
     toast.success("Professional report generated!");
@@ -306,7 +342,7 @@ export default function Reports() {
   // ✅ FIX: WHITE SCREEN PROTECTION
   if (loading || !data) {
       return (
-          <div className="flex flex-col items-center justify-center min-h-screen text-gray-400">
+          <div className="flex flex-col items-center justify-center min-h-screen text-muted-foreground">
               <Package className="w-12 h-12 animate-bounce mb-4 opacity-20" />
               <p>Calculating your farm report...</p>
           </div>
@@ -406,7 +442,7 @@ export default function Reports() {
                         </ResponsiveContainer>
                     </ChartCard>
                     <ChartCard title="Crop Distribution">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <PieChart>
                                 <Pie data={data.charts.cropDist || []} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" dataKey="value">
                                     {data.charts.cropDist?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
@@ -422,7 +458,7 @@ export default function Reports() {
             return (
                 <>
                     <ChartCard title="Expenses by Category">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <PieChart>
                                 <Pie data={data.charts.categoryDist || []} cx="50%" cy="50%" outerRadius={80} fill="#ef4444" dataKey="value" label>
                                     {data.charts.categoryDist?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
@@ -433,7 +469,7 @@ export default function Reports() {
                         </ResponsiveContainer>
                     </ChartCard>
                     <ChartCard title="Spending Trend">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <BarChart data={data.charts.expenseTrend || []}>
                                 {commonGrid}
                                 <XAxis dataKey="name" />
@@ -450,7 +486,7 @@ export default function Reports() {
                 <>
                     <div className="lg:col-span-2">
                         <ChartCard title="Revenue Trend Analysis">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                                 <AreaChart data={data.charts.salesTrend || []}>
                                     <defs>
                                         <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
@@ -469,7 +505,7 @@ export default function Reports() {
                     </div>
                     <div className="lg:col-span-2">
                         <ChartCard title="Top Customers (Revenue)">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                                 <BarChart data={data.charts.topItems || []} layout="vertical">
                                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                                     <XAxis type="number" />
@@ -486,7 +522,7 @@ export default function Reports() {
             return (
                 <>
                     <ChartCard title="Top Stock Levels">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <BarChart data={data.charts.stockLevels || []} layout="vertical" margin={{ left: 20 }}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                                 <XAxis type="number" />
@@ -497,7 +533,7 @@ export default function Reports() {
                         </ResponsiveContainer>
                     </ChartCard>
                     <ChartCard title="Value by Category">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <PieChart>
                                 <Pie data={data.charts.categoryValue || []} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" dataKey="value">
                                     {data.charts.categoryValue?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
@@ -513,7 +549,7 @@ export default function Reports() {
              return (
                 <>
                     <ChartCard title="Species Distribution">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <PieChart>
                                 <Pie data={data.charts.speciesDist || []} cx="50%" cy="50%" outerRadius={80} fill="#8884d8" dataKey="value" label>
                                     {data.charts.speciesDist?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
@@ -524,7 +560,7 @@ export default function Reports() {
                         </ResponsiveContainer>
                     </ChartCard>
                     <ChartCard title="Health Status">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <BarChart data={data.charts.healthDist || []}>
                                 {commonGrid}
                                 <XAxis dataKey="name" />
@@ -544,7 +580,7 @@ export default function Reports() {
              return (
                 <>
                     <ChartCard title="Pending Tasks by Priority">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <PieChart>
                                 <Pie data={data.charts.priorityDist || []} cx="50%" cy="50%" outerRadius={80} fill="#8884d8" dataKey="value" label>
                                     {data.charts.priorityDist?.map((entry: any, index: number) => (
@@ -562,7 +598,7 @@ export default function Reports() {
              return (
                 <>
                     <ChartCard title="Yield Estimates vs Actuals">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <BarChart data={data.charts.yieldComparison || []}>
                                 {commonGrid}
                                 <XAxis dataKey="name" />
@@ -575,7 +611,7 @@ export default function Reports() {
                         </ResponsiveContainer>
                     </ChartCard>
                     <ChartCard title="Land Usage (Acres)">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <PieChart>
                                 <Pie data={data.charts.landUsage || []} cx="50%" cy="50%" outerRadius={80} fill="#8884d8" dataKey="value" label>
                                     {data.charts.landUsage?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
@@ -596,21 +632,21 @@ export default function Reports() {
       
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
-          <p className="text-gray-500">Analyze your farm performance</p>
+          <h1 className="text-2xl font-bold text-card-foreground">Reports & Analytics</h1>
+          <p className="text-muted-foreground">Analyze your farm performance</p>
         </div>
         
         <div className="flex gap-3 w-full md:w-auto">
             <div className="relative flex-1 md:flex-none">
-                <select className="appearance-none w-full bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-primary-500 shadow-sm cursor-pointer" value={period} onChange={handlePeriodChange}>
+                <select className="appearance-none w-full bg-card border border-border text-foreground py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-primary-500 shadow-sm cursor-pointer" value={period} onChange={handlePeriodChange}>
                     <option value="month">This Month</option>
                     <option value="year">This Year</option>
                     <option value="all">All Time</option>
                 </select>
-                <ChevronDown className="w-4 h-4 text-gray-500 absolute right-3 top-3 pointer-events-none" />
+                <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-3 top-3 pointer-events-none" />
             </div>
             <div className="relative flex-1 md:flex-none">
-                <select className="appearance-none w-full bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-primary-500 font-bold shadow-sm cursor-pointer" value={reportType} onChange={handleTypeChange}>
+                <select className="appearance-none w-full bg-card border border-border text-foreground py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-primary-500 font-bold shadow-sm cursor-pointer" value={reportType} onChange={handleTypeChange}>
                     <option value="overview">Overview</option>
                     <option value="sales">Sales</option>
                     <option value="expenses">Expenses</option>
@@ -619,7 +655,7 @@ export default function Reports() {
                     <option value="livestock">Livestock</option>
                     <option value="tasks">Tasks</option>
                 </select>
-                <Filter className="w-4 h-4 text-gray-500 absolute right-3 top-3 pointer-events-none" />
+                <Filter className="w-4 h-4 text-muted-foreground absolute right-3 top-3 pointer-events-none" />
             </div>
             <button onClick={generatePDF} className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors shadow-lg shadow-primary-200">
                 <FileDown className="w-4 h-4" /> <span className="hidden md:inline">PDF</span>
@@ -648,10 +684,10 @@ function KpiCard({ title, value, sub, icon: Icon, color }: any) {
     };
     
     return (
-        <div className="bg-white p-6 rounded-xl border-2 border-gray-100 shadow-sm flex items-start justify-between hover:shadow-md transition-all">
+        <div className="bg-card p-6 rounded-xl border-2 border-border shadow-sm flex items-start justify-between hover:shadow-md transition-all">
             <div>
-                <p className="text-sm font-bold text-gray-500 mb-1">{title}</p>
-                <h3 className="text-3xl font-bold text-gray-900">{value}</h3>
+                <p className="text-sm font-bold text-muted-foreground mb-1">{title}</p>
+                <h3 className="text-3xl font-bold text-card-foreground">{value}</h3>
                 {sub && <p className={`text-xs mt-2 font-medium ${sub.includes('Attention') || sub.includes('Urgent') ? 'text-red-500' : 'text-primary-600'}`}>{sub}</p>}
             </div>
             <div className={`p-3 rounded-lg ${colors[color] || colors.teal}`}>
@@ -663,8 +699,8 @@ function KpiCard({ title, value, sub, icon: Icon, color }: any) {
 
 function ChartCard({ title, children }: any) {
     return (
-        <div className="bg-white p-6 rounded-xl border-2 border-gray-100 shadow-sm h-96 hover:border-gray-200 transition-colors flex flex-col">
-            <h3 className="text-lg font-bold text-gray-800 mb-6 shrink-0">{title}</h3>
+        <div className="bg-card p-6 rounded-xl border-2 border-border shadow-sm h-96 hover:border-border transition-colors flex flex-col">
+            <h3 className="text-lg font-bold text-card-foreground mb-6 shrink-0">{title}</h3>
             <div className="flex-1 min-h-0 w-full relative">
                 {children}
             </div>

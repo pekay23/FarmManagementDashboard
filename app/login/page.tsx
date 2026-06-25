@@ -1,35 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { Loader2, Lock, Mail, Sprout } from "lucide-react";
 
 export default function LoginPage() {
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMounted(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    const formData = new FormData(e.currentTarget);
-    const email = String(formData.get("email") || "");
-    const password = String(formData.get("password") || "");
+    try {
+      const res = await signIn("credentials", {
+        redirect: false,
+        email,
+        password,
+      });
 
-    const res = await signIn("credentials", {
-      redirect: false,
-      email,
-      password,
-    });
+      if (res?.error) {
+        setError("Invalid email or password");
+        setLoading(false);
+        return;
+      }
 
-    if (res?.error) {
-      setError("Invalid email or password");
+      window.location.href = "/";
+    } catch (err) {
+      console.error("Login network error:", err);
+      setError("Network error: Could not reach authentication server.");
       setLoading(false);
-      return;
     }
-
-    window.location.href = "/";
   }
 
   return (
@@ -59,9 +69,10 @@ export default function LoginPage() {
             <div className="relative">
               <Mail className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
               <input
-                name="email"
                 type="email"
                 required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@farm.com"
                 className="w-full rounded-lg border border-input bg-surface-raised p-3 pl-10 text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
               />
@@ -73,9 +84,10 @@ export default function LoginPage() {
             <div className="relative">
               <Lock className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
               <input
-                name="password"
                 type="password"
                 required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
                 className="w-full rounded-lg border border-input bg-surface-raised p-3 pl-10 text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
               />
@@ -83,10 +95,11 @@ export default function LoginPage() {
           </div>
 
           <button
-            disabled={loading}
+            type="submit"
+            disabled={!mounted || loading}
             className="flex w-full items-center justify-center rounded-lg bg-primary py-3 font-bold text-primary-foreground shadow-md transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Sign in"}
+            {!mounted ? <Loader2 className="h-5 w-5 animate-spin" /> : loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Sign in"}
           </button>
         </form>
 

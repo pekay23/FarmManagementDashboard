@@ -12,7 +12,7 @@ export function useFormAutoSave(key: string, values: any, setValues: (val: any) 
         const parsed = JSON.parse(saved);
         setValues(parsed);
         toast.info("Restored your unsaved draft");
-      } catch (e) {
+      } catch {
         console.error("Failed to parse saved draft");
       }
     }
