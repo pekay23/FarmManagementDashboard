@@ -48,6 +48,6 @@
     "marked": "^18.0.5",
     "postcss": "^8.5.15",
     "tailwindcss": "^4.3.0",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.0"
   }
 }
