@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>07 · Icons & illustrations · Hughes Farms</title>
+<title>07 · Icons &amp; illustrations · Hughes Farms</title>
+<link rel="stylesheet" href="../design-tokens.css">
 <link rel="stylesheet" href="../docs.css">
 </head>
 <body>
@@ -13,23 +14,25 @@
   <a class="he-nav__brand" href="../index.html">Hughes Farms <small>docs</small></a>
   <div class="he-nav__links">
     <a href="../index.html">Index</a>
-    <a href="../architecture/system-overview.html">Architecture</a>
-    <a href="../design/01-foundations.html">Design</a>
-    <a href="../guides/setup.html">Guides</a>
-    <a href="../audits/known-issues.html">Audits</a>
-    <a href="../plans/future-plans.html">Plans</a>
+    <a href="../index.html#overview">Overview</a>
+    <a href="../index.html#architecture">Architecture</a>
+    <a href="../index.html#audits">Audits</a>
+    <a href="../index.html#design">Design</a>
+    <a href="../index.html#guides">Guides</a>
+    <a href="../index.html#plans">Plans</a>
   </div>
 </nav>
 <div class="he-layout">
 <main class="he-main">
 <header>
   <p class="he-eyebrow">Design</p>
-  <h1 class="he-title">07 · Icons & illustrations</h1>
+  <h1 class="he-title">07 · Icons &amp; illustrations</h1>
   <p class="he-deck">Every icon in the app comes from <a href="https://lucide.dev">Lucide</a> (via <code>lucide-react@1.x</code>). Lucide was chosen because…</p>
 </header>
+
 <section class="he-section" id="icon-set-lucide">
   <div class="he-section__num">01 · Icon set — Lucide</div>
-  <h2 class="he-section__title">Icon set — Lucide</h2><p>Every icon in the app comes from <a href="https://lucide.dev" target="_blank" rel="noopener noreferrer">Lucide</a> (via
+  <h2 class="he-section__title">Icon set — Lucide</h2><p>Every icon in the app comes from <a href="https://lucide.dev">Lucide</a> (via
 <code>lucide-react@1.x</code>). Lucide was chosen because:</p>
 <ul>
 <li>It&#39;s a <strong>tree-shakeable</strong> ESM package — only the icons you import
@@ -42,7 +45,9 @@ crisp at any DPI and accessible to screen readers.</li>
   Sprout, Tractor, Beef, Package, Users, ClipboardList,
   TrendingDown, DollarSign, BarChart3, Settings, Home,
   LayoutDashboard, Shield, LogOut, Menu, X
-} from "lucide-react";</code></pre><p>Group all imports for a single file in one statement, sorted
+} from &quot;lucide-react&quot;;
+</code></pre>
+<p>Group all imports for a single file in one statement, sorted
 alphabetically, with a single multi-line format.</p>
 <h3 id="sizing">Sizing</h3><p>Icons use one of five size classes. Don&#39;t pass arbitrary px values.</p>
 <table>
@@ -81,13 +86,18 @@ alphabetically, with a single multi-line format.</p>
 </tbody></table>
 <h3 id="colour">Colour</h3><p>Icons inherit <code>currentColor</code>, so colour them by setting the text colour
 on the parent:</p>
-<pre><code class="language-tsx"><button className="text-muted-foreground hover:text-foreground">
-  <Pencil className="w-4 h-4" />
-</button></code></pre><p>For coloured status icons (e.g. a red trash button) set the colour
+<pre><code class="language-tsx">&lt;button className=&quot;text-muted-foreground hover:text-foreground&quot;&gt;
+  &lt;Pencil className=&quot;w-4 h-4&quot; /&gt;
+&lt;/button&gt;
+</code></pre>
+<p>For coloured status icons (e.g. a red trash button) set the colour
 explicitly via the wrapper:</p>
-<pre><code class="language-tsx"><button className="text-gray-500 hover:text-destructive">
-  <Trash2 className="w-4 h-4" />
-</button></code></pre><section class="he-section" id="the-farm-logo">
+<pre><code class="language-tsx">&lt;button className=&quot;text-gray-500 hover:text-destructive&quot;&gt;
+  &lt;Trash2 className=&quot;w-4 h-4&quot; /&gt;
+&lt;/button&gt;
+</code></pre>
+
+<section class="he-section" id="the-farm-logo">
   <div class="he-section__num">02 · The farm logo</div>
   <h2 class="he-section__title">The farm logo</h2><p>A hand-drawn tractor-with-fields SVG, embedded as a base64 string in
 <code>lib/logo.ts</code> and re-used by:</p>
@@ -101,10 +111,11 @@ explicitly via the wrapper:</p>
 any <code>fetch</code> of an asset at runtime. To replace the logo, drop a new
 SVG into <code>public/farmslogo.svg</code> and regenerate the base64 constant
 with the helper in <code>convert_logo.py</code> at the repo root.</p>
+
 <section class="he-section" id="illustrations">
   <div class="he-section__num">03 · Illustrations</div>
   <h2 class="he-section__title">Illustrations</h2><p>The app has <strong>no decorative illustrations</strong>. Empty states use a single
-faded Lucide icon (e.g. <code><Sprout className="w-12 h-12 mb-2 opacity-20" /></code>)
+faded Lucide icon (e.g. <code>&lt;Sprout className=&quot;w-12 h-12 mb-2 opacity-20&quot; /&gt;</code>)
 plus a one-line description — this keeps the bundle small and the
 &quot;feel&quot; consistent across the app.</p>
 <p>If you ever need richer illustrations, prefer a <strong>single monochrome
