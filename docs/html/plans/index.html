@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Plans · Hughes Farms</title>
+<link rel="stylesheet" href="../design-tokens.css">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<div class="he-shell">
+
+<nav class="he-nav">
+  <a class="he-nav__brand" href="../index.html">Hughes Farms <small>docs</small></a>
+  <div class="he-nav__links">
+    <a href="../index.html">Index</a>
+    <a href="../architecture/index.html">Architecture</a>
+    <a href="../guides/index.html">Guides</a>
+    <a href="../plans/index.html">Plans</a>
+    <a href="../design/index.html">Design</a>
+    <a href="../audits/index.html">Audits</a>
+  </div>
+</nav>
+
+<main>
+<header>
+  <p class="he-eyebrow">Docs</p>
+  <h1 class="he-title">Plans</h1>
+  
+</header>
+
+<nav class="he-bc" aria-label="Breadcrumb">
+  <a class="he-bc__item" href="../index.html">Docs</a><span class="he-bc__sep">/</span><span class="he-bc__item">Plans</span>
+</nav>
+
+<div class="he-folder-controls">
+  <label for="sort-select">Sort</label>
+  <select id="sort-select" onchange="sortDocs(this.value)" class="he-sort-select">
+    <option value="newest">Newest first</option>
+    <option value="oldest">Oldest first</option>
+    <option value="az">A → Z</option>
+    <option value="za">Z → A</option>
+  </select>
+</div>
+<ul class="he-linklist" id="docs-list">
+    
+    <li class="he-linklist__row" data-date="2026-06-05" data-title="Future plans">
+      <a class="he-linklist__link" href="future-plans.html">Future plans</a>
+      <span class="he-linklist__meta">2026-06-05</span>
+    </li>
+  </ul>
+<script>
+function sortDocs(criteria) {
+  const list = document.getElementById('docs-list');
+  if (!list) return;
+  const rows = Array.from(list.children);
+  rows.sort((a, b) => {
+    const aDate = a.dataset.date || '';
+    const bDate = b.dataset.date || '';
+    const aTitle = a.dataset.title || '';
+    const bTitle = b.dataset.title || '';
+    switch (criteria) {
+      case 'newest': return bDate.localeCompare(aDate) || aTitle.localeCompare(bTitle);
+      case 'oldest': return aDate.localeCompare(bDate) || aTitle.localeCompare(bTitle);
+      case 'az': return aTitle.localeCompare(bTitle);
+      case 'za': return bTitle.localeCompare(aTitle);
+      default: return 0;
+    }
+  });
+  rows.forEach(row => list.appendChild(row));
+}
+</script>
+
+</main>
+
+
+<footer class="he-foot">
+  Source · <a href="../..">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+</footer>
+</div>
+</body>
+</html>

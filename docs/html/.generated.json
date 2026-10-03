@@ -1,0 +1,29 @@
+{
+  "files": [
+    "CHANGELOG.html",
+    "LLM_COUNCIL_FRAMEWORK.html",
+    "PORTFOLIO-SUMMARY.html",
+    "README.html",
+    "architecture/data-flow.html",
+    "architecture/data-model.html",
+    "architecture/index.html",
+    "architecture/system-overview.html",
+    "audits/index.html",
+    "audits/known-issues.html",
+    "design/01-foundations.html",
+    "design/02-colors.html",
+    "design/03-typography.html",
+    "design/04-sizing.html",
+    "design/05-components.html",
+    "design/06-motion.html",
+    "design/07-icons-illustrations.html",
+    "design/index.html",
+    "guides/contributing.html",
+    "guides/deployment.html",
+    "guides/index.html",
+    "guides/setup.html",
+    "index.html",
+    "plans/future-plans.html",
+    "plans/index.html"
+  ]
+}

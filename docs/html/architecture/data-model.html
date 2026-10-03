@@ -14,12 +14,11 @@
   <a class="he-nav__brand" href="../index.html">Hughes Farms <small>docs</small></a>
   <div class="he-nav__links">
     <a href="../index.html">Index</a>
-    <a href="../index.html#overview">Overview</a>
-    <a href="../index.html#architecture">Architecture</a>
-    <a href="../index.html#audits">Audits</a>
-    <a href="../index.html#design">Design</a>
-    <a href="../index.html#guides">Guides</a>
-    <a href="../index.html#plans">Plans</a>
+    <a href="../architecture/index.html">Architecture</a>
+    <a href="../guides/index.html">Guides</a>
+    <a href="../plans/index.html">Plans</a>
+    <a href="../design/index.html">Design</a>
+    <a href="../audits/index.html">Audits</a>
   </div>
 </nav>
 <div class="he-layout">
@@ -29,7 +28,7 @@
   <h1 class="he-title">Data model</h1>
   <p class="he-deck">The Hughes Farms schema lives in <strong>two places</strong> that must stay in sync…</p>
 </header>
-<p>Every server-side row carries a <code>farm_id</code> matching the user&#39;s tenant.
+<p>Every server-side row carries a <code>farm_id</code> matching the user's tenant.
 The JWT exposes <code>farm_id</code>; API handlers must filter by it. The single
 exception is <code>is_superadmin === true</code>, which bypasses the <code>farm_id</code>
 filter and can aggregate across tenants (used by the
@@ -51,7 +50,7 @@ filter and can aggregate across tenants (used by the
 </aside>
 </div>
 <footer class="he-foot">
-  Source · <a href="../../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+  Source · <a href="../..">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
 </footer>
 </div>
 </body>

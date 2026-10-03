@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Design · Hughes Farms</title>
+<link rel="stylesheet" href="../design-tokens.css">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<div class="he-shell">
+
+<nav class="he-nav">
+  <a class="he-nav__brand" href="../index.html">Hughes Farms <small>docs</small></a>
+  <div class="he-nav__links">
+    <a href="../index.html">Index</a>
+    <a href="../architecture/index.html">Architecture</a>
+    <a href="../guides/index.html">Guides</a>
+    <a href="../plans/index.html">Plans</a>
+    <a href="../design/index.html">Design</a>
+    <a href="../audits/index.html">Audits</a>
+  </div>
+</nav>
+
+<main>
+<header>
+  <p class="he-eyebrow">Docs</p>
+  <h1 class="he-title">Design</h1>
+  
+</header>
+
+<nav class="he-bc" aria-label="Breadcrumb">
+  <a class="he-bc__item" href="../index.html">Docs</a><span class="he-bc__sep">/</span><span class="he-bc__item">Design</span>
+</nav>
+
+<div class="he-folder-controls">
+  <label for="sort-select">Sort</label>
+  <select id="sort-select" onchange="sortDocs(this.value)" class="he-sort-select">
+    <option value="newest">Newest first</option>
+    <option value="oldest">Oldest first</option>
+    <option value="az">A → Z</option>
+    <option value="za">Z → A</option>
+  </select>
+</div>
+<ul class="he-linklist" id="docs-list">
+    
+    <li class="he-linklist__row" data-date="2026-06-05" data-title="06 · Motion">
+      <a class="he-linklist__link" href="06-motion.html">06 · Motion</a>
+      <span class="he-linklist__meta">2026-06-05</span>
+    </li>
+    <li class="he-linklist__row" data-date="2026-06-05" data-title="07 · Icons &amp; illustrations">
+      <a class="he-linklist__link" href="07-icons-illustrations.html">07 · Icons &amp; illustrations</a>
+      <span class="he-linklist__meta">2026-06-05</span>
+    </li>
+    <li class="he-linklist__row" data-date="2026-06-04" data-title="01 · Foundations">
+      <a class="he-linklist__link" href="01-foundations.html">01 · Foundations</a>
+      <span class="he-linklist__meta">2026-06-04</span>
+    </li>
+    <li class="he-linklist__row" data-date="2026-06-04" data-title="02 · Color tokens">
+      <a class="he-linklist__link" href="02-colors.html">02 · Color tokens</a>
+      <span class="he-linklist__meta">2026-06-04</span>
+    </li>
+    <li class="he-linklist__row" data-date="2026-06-04" data-title="03 · Typography">
+      <a class="he-linklist__link" href="03-typography.html">03 · Typography</a>
+      <span class="he-linklist__meta">2026-06-04</span>
+    </li>
+    <li class="he-linklist__row" data-date="2026-06-04" data-title="04 · Sizing &amp; spacing">
+      <a class="he-linklist__link" href="04-sizing.html">04 · Sizing &amp; spacing</a>
+      <span class="he-linklist__meta">2026-06-04</span>
+    </li>
+    <li class="he-linklist__row" data-date="2026-06-04" data-title="05 · Components">
+      <a class="he-linklist__link" href="05-components.html">05 · Components</a>
+      <span class="he-linklist__meta">2026-06-04</span>
+    </li>
+  </ul>
+<script>
+function sortDocs(criteria) {
+  const list = document.getElementById('docs-list');
+  if (!list) return;
+  const rows = Array.from(list.children);
+  rows.sort((a, b) => {
+    const aDate = a.dataset.date || '';
+    const bDate = b.dataset.date || '';
+    const aTitle = a.dataset.title || '';
+    const bTitle = b.dataset.title || '';
+    switch (criteria) {
+      case 'newest': return bDate.localeCompare(aDate) || aTitle.localeCompare(bTitle);
+      case 'oldest': return aDate.localeCompare(bDate) || aTitle.localeCompare(bTitle);
+      case 'az': return aTitle.localeCompare(bTitle);
+      case 'za': return bTitle.localeCompare(aTitle);
+      default: return 0;
+    }
+  });
+  rows.forEach(row => list.appendChild(row));
+}
+</script>
+
+</main>
+
+
+<footer class="he-foot">
+  Source · <a href="../..">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+</footer>
+</div>
+</body>
+</html>

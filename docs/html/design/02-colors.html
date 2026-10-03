@@ -14,12 +14,11 @@
   <a class="he-nav__brand" href="../index.html">Hughes Farms <small>docs</small></a>
   <div class="he-nav__links">
     <a href="../index.html">Index</a>
-    <a href="../index.html#overview">Overview</a>
-    <a href="../index.html#architecture">Architecture</a>
-    <a href="../index.html#audits">Audits</a>
-    <a href="../index.html#design">Design</a>
-    <a href="../index.html#guides">Guides</a>
-    <a href="../index.html#plans">Plans</a>
+    <a href="../architecture/index.html">Architecture</a>
+    <a href="../guides/index.html">Guides</a>
+    <a href="../plans/index.html">Plans</a>
+    <a href="../design/index.html">Design</a>
+    <a href="../audits/index.html">Audits</a>
   </div>
 </nav>
 <div class="he-layout">
@@ -29,7 +28,7 @@
   <h1 class="he-title">02 · Color tokens</h1>
   <p class="he-deck">The palette is split into <strong>three layers</strong>, all defined as CSS variables in <code>app/globals.css</code> and exposed to Tailwind via the <code>@theme inline</code> block (so JSX keeps using utilities like <code>bg-primary</code> / <code>text-foreground</code> / <code>border-border</code>).</p>
 </header>
-<p><code>@theme inline</code> is Tailwind 4&#39;s &quot;expose this CSS variable as a utility&quot;
+<p><code>@theme inline</code> is Tailwind 4's &quot;expose this CSS variable as a utility&quot;
 syntax — <code>--color-X</code> becomes <code>bg-X</code>, <code>text-X</code>, <code>border-X</code>, <code>ring-X</code>,
 etc. The <code>inline</code> keyword tells Tailwind to keep the values as <code>var(…)</code>
 references instead of inlining the literal, so dark-mode switches
@@ -51,7 +50,7 @@ automatically when the <code>.dark</code> class lands on <code>&lt;html&gt;</cod
 </aside>
 </div>
 <footer class="he-foot">
-  Source · <a href="../../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+  Source · <a href="../..">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
 </footer>
 </div>
 </body>

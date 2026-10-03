@@ -4,22 +4,21 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Documentation · Hughes Farms</title>
-<link rel="stylesheet" href="./design-tokens.css">
-<link rel="stylesheet" href="./docs.css">
+<link rel="stylesheet" href="design-tokens.css">
+<link rel="stylesheet" href="docs.css">
 </head>
 <body>
-<div class="he-shell ">
+<div class="he-shell">
 
 <nav class="he-nav">
   <a class="he-nav__brand" href="./index.html">Hughes Farms <small>docs</small></a>
   <div class="he-nav__links">
     <a href="./index.html">Index</a>
-    <a href="./index.html#overview">Overview</a>
-    <a href="./index.html#architecture">Architecture</a>
-    <a href="./index.html#audits">Audits</a>
-    <a href="./index.html#design">Design</a>
-    <a href="./index.html#guides">Guides</a>
-    <a href="./index.html#plans">Plans</a>
+    <a href="./architecture/index.html">Architecture</a>
+    <a href="./guides/index.html">Guides</a>
+    <a href="./plans/index.html">Plans</a>
+    <a href="./design/index.html">Design</a>
+    <a href="./audits/index.html">Audits</a>
   </div>
 </nav>
 
@@ -27,200 +26,110 @@
 <header>
   <p class="he-eyebrow">Hughes Farms · docs</p>
   <h1 class="he-title">Documentation</h1>
-  <p class="he-deck">All project documentation, generated from the markdown under <code>docs/</code> and organised by folder.</p>
+  
 </header>
 
-<div class="he-kpis">
-  <div class="he-kpi"><div class="he-kpi__value">19</div><div class="he-kpi__label">Generated pages</div></div>
-  <div class="he-kpi"><div class="he-kpi__value">6</div><div class="he-kpi__label">Sections</div></div>
-  <div class="he-kpi"><div class="he-kpi__value">3</div><div class="he-kpi__label">Standalone reports</div></div>
-</div>
+<p class="he-index-summary">19 documents in 6 sections.</p>
 
-<section class="he-index-section" id="overview">
-  <div class="he-index-section__head">
-    <h2>Overview</h2>
-    <p class="he-index-section__blurb">Top-level documents.</p>
-  </div>
-  <div class="he-grid">
-    <a class="he-card" href="./CHANGELOG.html">
-      <div class="he-card__eyebrow">Overview</div>
-      <h3>Changelog</h3>
-      <p>All notable changes to Hughes Farms are documented here.</p>
-      <div class="he-card__meta"><span>docs/CHANGELOG.md</span></div>
-    </a>
-    <a class="he-card" href="./LLM_COUNCIL_FRAMEWORK.html">
-      <div class="he-card__eyebrow">Overview</div>
-      <h3>The LLM Council Framework</h3>
-      <p>The **LLM Council** is an advanced AI evaluation framework used by engineering and design teams to ensure robust, unbiased, and high-quality outcomes when reviewing code, architect</p>
-      <div class="he-card__meta"><span>docs/LLM_COUNCIL_FRAMEWORK.md</span></div>
-    </a>
-    <a class="he-card" href="./PORTFOLIO-SUMMARY.html">
-      <div class="he-card__eyebrow">Overview</div>
-      <h3>Portfolio summary</h3>
-      <p>---…</p>
-      <div class="he-card__meta"><span>docs/PORTFOLIO-SUMMARY.md</span></div>
-    </a>
-    <a class="he-card" href="./README.html">
-      <div class="he-card__eyebrow">Overview</div>
-      <h3>Hughes Farms — Documentation</h3>
-      <p>All project documentation lives in this folder, organised by purpose.</p>
-      <div class="he-card__meta"><span>docs/README.md</span></div>
-    </a>
-  </div>
+<section class="he-index-section" id="top-level">
+  <h2 class="he-index-section__title">Top-level</h2>
+  <ul class="he-linklist">
+<li class="he-linklist__row">
+      <a class="he-linklist__link" href="./CHANGELOG.html">Changelog</a>
+    </li>
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./LLM_COUNCIL_FRAMEWORK.html">The LLM Council Framework</a>
+    </li>
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./PORTFOLIO-SUMMARY.html">Portfolio summary</a>
+    </li>
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./README.html">Hughes Farms — Documentation</a>
+    </li>
+  </ul>
 </section>
 
 <section class="he-index-section" id="architecture">
-  <div class="he-index-section__head">
-    <h2>Architecture</h2>
-    <p class="he-index-section__blurb">3 documents.</p>
-  </div>
-  <div class="he-grid">
-    <a class="he-card" href="./architecture/data-flow.html">
-      <div class="he-card__eyebrow">Architecture</div>
-      <h3>Data flow &amp; offline sync</h3>
-      <p>Hughes Farms is **offline-first**: every screen reads from and writes to the on-device IndexedDB (Dexie).</p>
-      <div class="he-card__meta"><span>docs/architecture/data-flow.md</span></div>
-    </a>
-    <a class="he-card" href="./architecture/data-model.html">
-      <div class="he-card__eyebrow">Architecture</div>
-      <h3>Data model</h3>
-      <p>The Hughes Farms schema lives in **two places** that must stay in sync…</p>
-      <div class="he-card__meta"><span>docs/architecture/data-model.md</span></div>
-    </a>
-    <a class="he-card" href="./architecture/system-overview.html">
-      <div class="he-card__eyebrow">Architecture</div>
-      <h3>System overview</h3>
-      <p>Hughes Farms is an **offline-first** farm management PWA for small-to-mid sized mixed crop-and-livestock operations.</p>
-      <div class="he-card__meta"><span>docs/architecture/system-overview.md</span></div>
-    </a>
-  </div>
-</section>
-
-<section class="he-index-section" id="audits">
-  <div class="he-index-section__head">
-    <h2>Audits</h2>
-    <p class="he-index-section__blurb">1 document.</p>
-  </div>
-  <div class="he-grid">
-    <a class="he-card" href="./audits/known-issues.html">
-      <div class="he-card__eyebrow">Audits</div>
-      <h3>Known issues</h3>
-      <p>Persistent issues that aren't blockers but are worth knowing about.</p>
-      <div class="he-card__meta"><span>docs/audits/known-issues.md</span></div>
-    </a>
-  </div>
-</section>
-
-<section class="he-index-section" id="design">
-  <div class="he-index-section__head">
-    <h2>Design</h2>
-    <p class="he-index-section__blurb">7 documents.</p>
-  </div>
-  <div class="he-grid">
-    <a class="he-card" href="./design/01-foundations.html">
-      <div class="he-card__eyebrow">Design</div>
-      <h3>01 · Foundations</h3>
-      <p></p>
-      <div class="he-card__meta"><span>docs/design/01-foundations.md</span></div>
-    </a>
-    <a class="he-card" href="./design/02-colors.html">
-      <div class="he-card__eyebrow">Design</div>
-      <h3>02 · Color tokens</h3>
-      <p>The palette is split into **three layers**, all defined as CSS variables in `app/globals.css` and exposed to Tailwind via the `@theme inline` block (so JSX keeps using utilities li</p>
-      <div class="he-card__meta"><span>docs/design/02-colors.md</span></div>
-    </a>
-    <a class="he-card" href="./design/03-typography.html">
-      <div class="he-card__eyebrow">Design</div>
-      <h3>03 · Typography</h3>
-      <p>The whole app uses **Inter** as its single typeface.</p>
-      <div class="he-card__meta"><span>docs/design/03-typography.md</span></div>
-    </a>
-    <a class="he-card" href="./design/04-sizing.html">
-      <div class="he-card__eyebrow">Design</div>
-      <h3>04 · Sizing &amp; spacing</h3>
-      <p>Tailwind 4 ships a 4-px base spacing scale by default.</p>
-      <div class="he-card__meta"><span>docs/design/04-sizing.md</span></div>
-    </a>
-    <a class="he-card" href="./design/05-components.html">
-      <div class="he-card__eyebrow">Design</div>
-      <h3>05 · Components</h3>
-      <p>A reference for the recurring UI pieces in the app.</p>
-      <div class="he-card__meta"><span>docs/design/05-components.md</span></div>
-    </a>
-    <a class="he-card" href="./design/06-motion.html">
-      <div class="he-card__eyebrow">Design</div>
-      <h3>06 · Motion</h3>
-      <p>The app uses motion sparingly — it should *confirm* an action, not *preattentively* attract the eye.</p>
-      <div class="he-card__meta"><span>docs/design/06-motion.md</span></div>
-    </a>
-    <a class="he-card" href="./design/07-icons-illustrations.html">
-      <div class="he-card__eyebrow">Design</div>
-      <h3>07 · Icons &amp; illustrations</h3>
-      <p>Every icon in the app comes from [Lucide](https://lucide.dev) (via `lucide-react@1.x`). Lucide was chosen because…</p>
-      <div class="he-card__meta"><span>docs/design/07-icons-illustrations.md</span></div>
-    </a>
-  </div>
+  <h2 class="he-index-section__title"><a href="./architecture/index.html">Architecture</a> <span class="he-linklist__meta">3</span></h2>
+  <ul class="he-linklist">
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./architecture/data-flow.html">Data flow &amp; offline sync</a>
+    </li>
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./architecture/data-model.html">Data model</a>
+    </li>
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./architecture/system-overview.html">System overview</a>
+    </li>
+  </ul>
 </section>
 
 <section class="he-index-section" id="guides">
-  <div class="he-index-section__head">
-    <h2>Guides</h2>
-    <p class="he-index-section__blurb">3 documents.</p>
-  </div>
-  <div class="he-grid">
-    <a class="he-card" href="./guides/contributing.html">
-      <div class="he-card__eyebrow">Guides</div>
-      <h3>Contributing</h3>
-      <p>Examples: `feat/livestock-pdf-export`, `fix/sync-offline-crash`, `chore/upgrade-tailwind-v4`.</p>
-      <div class="he-card__meta"><span>docs/guides/contributing.md</span></div>
-    </a>
-    <a class="he-card" href="./guides/deployment.html">
-      <div class="he-card__eyebrow">Guides</div>
-      <h3>Deployment</h3>
-      <p>The app is configured to deploy to **Vercel** (see `vercel.json` in the repo root).</p>
-      <div class="he-card__meta"><span>docs/guides/deployment.md</span></div>
-    </a>
-    <a class="he-card" href="./guides/setup.html">
-      <div class="he-card__eyebrow">Guides</div>
-      <h3>Setup</h3>
-      <p>Get a working dev environment in under five minutes.</p>
-      <div class="he-card__meta"><span>docs/guides/setup.md</span></div>
-    </a>
-  </div>
+  <h2 class="he-index-section__title"><a href="./guides/index.html">Guides</a> <span class="he-linklist__meta">3</span></h2>
+  <ul class="he-linklist">
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./guides/contributing.html">Contributing</a>
+    </li>
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./guides/deployment.html">Deployment</a>
+    </li>
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./guides/setup.html">Setup</a>
+    </li>
+  </ul>
 </section>
 
 <section class="he-index-section" id="plans">
-  <div class="he-index-section__head">
-    <h2>Plans</h2>
-    <p class="he-index-section__blurb">1 document.</p>
-  </div>
-  <div class="he-grid">
-    <a class="he-card" href="./plans/future-plans.html">
-      <div class="he-card__eyebrow">Plans</div>
-      <h3>Future plans</h3>
-      <p>Open roadmap.</p>
-      <div class="he-card__meta"><span>docs/plans/future-plans.md</span></div>
-    </a>
-  </div>
+  <h2 class="he-index-section__title"><a href="./plans/index.html">Plans</a> <span class="he-linklist__meta">1</span></h2>
+  <ul class="he-linklist">
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./plans/future-plans.html">Future plans</a>
+    </li>
+  </ul>
 </section>
 
-<section class="he-index-section" id="standalone">
-  <div class="he-index-section__head">
-    <h2>Standalone HTML</h2>
-    <p class="he-index-section__blurb">Hand-authored visual reports — not derived from markdown.</p>
-  </div>
-  <div class="he-standalone-grid">
-    <div class="he-standalone-card"><a href="./changelog.html">changelog</a><p>↗ open report</p></div>
-    <div class="he-standalone-card"><a href="./llm-council.html">llm council</a><p>↗ open report</p></div>
-    <div class="he-standalone-card"><a href="./portfolio.html">portfolio</a><p>↗ open report</p></div>
-  </div>
+<section class="he-index-section" id="design">
+  <h2 class="he-index-section__title"><a href="./design/index.html">Design</a> <span class="he-linklist__meta">7</span></h2>
+  <ul class="he-linklist">
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./design/01-foundations.html">01 · Foundations</a>
+    </li>
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./design/02-colors.html">02 · Color tokens</a>
+    </li>
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./design/03-typography.html">03 · Typography</a>
+    </li>
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./design/04-sizing.html">04 · Sizing &amp; spacing</a>
+    </li>
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./design/05-components.html">05 · Components</a>
+    </li>
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./design/06-motion.html">06 · Motion</a>
+    </li>
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./design/07-icons-illustrations.html">07 · Icons &amp; illustrations</a>
+    </li>
+  </ul>
 </section>
+
+<section class="he-index-section" id="audits">
+  <h2 class="he-index-section__title"><a href="./audits/index.html">Audits</a> <span class="he-linklist__meta">1</span></h2>
+  <ul class="he-linklist">
+    <li class="he-linklist__row">
+      <a class="he-linklist__link" href="./audits/known-issues.html">Known issues</a>
+    </li>
+  </ul>
+</section>
+
 
 </main>
 
 
 <footer class="he-foot">
-  Source · <a href="./../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+  Source · <a href="..">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
 </footer>
 </div>
 </body>

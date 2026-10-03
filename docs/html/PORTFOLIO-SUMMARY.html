@@ -4,8 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Portfolio summary · Hughes Farms</title>
-<link rel="stylesheet" href="./design-tokens.css">
-<link rel="stylesheet" href="./docs.css">
+<link rel="stylesheet" href="design-tokens.css">
+<link rel="stylesheet" href="docs.css">
 </head>
 <body>
 <div class="he-shell he-shell--wide">
@@ -14,33 +14,32 @@
   <a class="he-nav__brand" href="./index.html">Hughes Farms <small>docs</small></a>
   <div class="he-nav__links">
     <a href="./index.html">Index</a>
-    <a href="./index.html#overview">Overview</a>
-    <a href="./index.html#architecture">Architecture</a>
-    <a href="./index.html#audits">Audits</a>
-    <a href="./index.html#design">Design</a>
-    <a href="./index.html#guides">Guides</a>
-    <a href="./index.html#plans">Plans</a>
+    <a href="./architecture/index.html">Architecture</a>
+    <a href="./guides/index.html">Guides</a>
+    <a href="./plans/index.html">Plans</a>
+    <a href="./design/index.html">Design</a>
+    <a href="./audits/index.html">Audits</a>
   </div>
 </nav>
 <div class="he-layout">
 <main class="he-main">
 <header>
-  <p class="he-eyebrow">Overview</p>
+  <p class="he-eyebrow">Docs</p>
   <h1 class="he-title">Portfolio summary</h1>
   <p class="he-deck">---…</p>
 </header>
-<blockquote><p>Drop-in summary for a portfolio site. Each block is self-contained —
+<blockquote>
+<p>Drop-in summary for a portfolio site. Each block is self-contained —
 paste the whole file, or just the bullets you need.</p>
-</blockquote><hr>
-
-<section class="he-section" id="at-a-glance">
-  <div class="he-section__num">01 · At a glance</div>
-  <h2 class="he-section__title">At a glance</h2><pre><code>PROJECT:      Hughes Farms — Farm Management Dashboard
+</blockquote>
+<hr />
+<section class="he-section" id="at-a-glance"><div class="he-section__num">01 · At a glance</div><h2 class="he-section__title">At a glance</h2></section>
+<pre><code>PROJECT:      Hughes Farms — Farm Management Dashboard
 INDUSTRY:     Agriculture / AgriTech (offline-first PWA)
 WHAT IT DOES: Lets small-to-mid farm owners run their mixed
               crop-and-livestock operation from a phone or tablet,
               even without internet, and syncs back to a central
-              Postgres database when they&#39;re online again.
+              Postgres database when they're online again.
 PROBLEM:      Smallholders in low-connectivity regions were still
               running their farms on paper ledgers and Excel sheets,
               losing data when devices failed and unable to coordinate
@@ -59,16 +58,15 @@ RESULT:       Used daily by a multi-farm operation in Ghana to
               replace paper ledgers. Zero data loss during multi-day
               offline windows; livestock health booklets now go
               straight to the vet instead of being hand-transcribed.
-PERMISSION:   It&#39;s mine (original client work; can anonymise on
+PERMISSION:   It's mine (original client work; can anonymise on
               request).
 LINKS:        https://github.com/pekay23/FarmManagementDashboard
               https://farm-management-dashboard.vercel.app
 </code></pre>
-<hr>
-
-<section class="he-section" id="formatted-for-a-portfolio-card">
-  <div class="he-section__num">02 · Formatted for a portfolio card</div>
-  <h2 class="he-section__title">Formatted for a portfolio card</h2><p><strong>Hughes Farms — Farm Management Dashboard</strong> · Agriculture<br>An offline-first Next.js + Dexie PWA that runs a mixed crop &amp;
+<hr />
+<section class="he-section" id="formatted-for-a-portfolio-card"><div class="he-section__num">02 · Formatted for a portfolio card</div><h2 class="he-section__title">Formatted for a portfolio card</h2></section>
+<p><strong>Hughes Farms — Farm Management Dashboard</strong> · Agriculture<br />
+An offline-first Next.js + Dexie PWA that runs a mixed crop &amp;
 livestock operation from a phone in a barn, syncs to Postgres when
 the network returns, and emits a per-animal health booklet (PDF) the
 vet can read on the spot. Now spans 16 feature areas — including
@@ -86,7 +84,7 @@ Sonner (toast) · lucide-react · <code>next-themes</code> (light + dark) ·
 <ul>
 <li><strong>Offline-first by design</strong>: every screen reads from and writes to
 IndexedDB; a 15 s poll + on-focus push keeps Postgres in sync
-when the network is up, and queues writes when it&#39;s not.</li>
+when the network is up, and queues writes when it's not.</li>
 <li><strong>Soft-delete + sync-status field</strong> on every entity keeps the
 local store and the server mirror eventually consistent without
 losing audit history.</li>
@@ -130,11 +128,9 @@ cache headers.</li>
 <code>eslint-plugin-react</code> → ESLint 10 incompatibility (documented in
 <code>docs/audits/known-issues.md</code>).</li>
 </ul>
-<hr>
-
-<section class="he-section" id="one-paragraph-version-for-about-this-project">
-  <div class="he-section__num">03 · One-paragraph version (for &quot;About this project&quot;)</div>
-  <h2 class="he-section__title">One-paragraph version (for &quot;About this project&quot;)</h2><p>Hughes Farms is an offline-first farm management PWA I built for a
+<hr />
+<section class="he-section" id="one-paragraph-version-for-quotabout-this-projectquot"><div class="he-section__num">03 · One-paragraph version (for &amp;quot;About this project&amp;quot;)</div><h2 class="he-section__title">One-paragraph version (for &quot;About this project&quot;)</h2></section>
+<p>Hughes Farms is an offline-first farm management PWA I built for a
 multi-farm operation that needed to keep working in low-connectivity
 areas of Ghana. It runs on Next.js 16 + React 19 + Tailwind 4 with
 Dexie 4 (v3 schema, 15 tables) as the local source of truth, syncs to
@@ -151,11 +147,9 @@ printable for the vet. The project is bootstrapped with bun, deployed
 to Vercel, and the only environmental quirk (a <code>react/display-name</code> ↔
 ESLint 10 compat shim) is auto-applied by a <code>postinstall</code> script and
 documented in the repo.</p>
-<hr>
-
-<section class="he-section" id="drop-in-bullets-for-a-project-card-or-what-i-did-list">
-  <div class="he-section__num">04 · Drop-in bullets (for a project card or &quot;what I did&quot; list)</div>
-  <h2 class="he-section__title">Drop-in bullets (for a project card or &quot;what I did&quot; list)</h2><ul>
+<hr />
+<section class="he-section" id="drop-in-bullets-for-a-project-card-or-quotwhat-i-didquot-list"><div class="he-section__num">04 · Drop-in bullets (for a project card or &amp;quot;what I did&amp;quot; list)</div><h2 class="he-section__title">Drop-in bullets (for a project card or &quot;what I did&quot; list)</h2></section>
+<ul>
 <li>Designed and shipped the full UX — 16 feature areas (dashboard,
 livestock, crops, inventory, employees, tasks, expenses, sales,
 reports, settings, field scouting, work orders, traceability,
@@ -174,7 +168,7 @@ Resource plan types) and a file-attachment system that stores data
 offline in IndexedDB.</li>
 <li>Embedded a live weather widget: GPS → IP → Accra fallback,
 Open-Meteo API, 1 h <code>localStorage</code> cache, 3-day forecast.</li>
-<li>Implemented the full light + dark design system on Tailwind 4&#39;s
+<li>Implemented the full light + dark design system on Tailwind 4's
 CSS-first <code>@theme</code>, with a <code>next-themes</code> toggle that persists.</li>
 <li>Migrated from npm + a 3 GB <code>--max-old-space-size</code> dev hack to
 bun, bumped every dep to latest (Next 16.2.7, React 19.2.7,
@@ -204,7 +198,7 @@ template as my other projects.</li>
 </aside>
 </div>
 <footer class="he-foot">
-  Source · <a href="./../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+  Source · <a href="..">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
 </footer>
 </div>
 </body>

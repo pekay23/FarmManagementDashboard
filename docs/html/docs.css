@@ -1,8 +1,9 @@
-/* Docs-site extensions to design-tokens.css (linked AFTER it, so these win). */
+/* TOC sidebar + index grid extensions to the base tokens. */
 
-/* Full-width shell. design-tokens.css caps .he-shell at --col-default/--col-wide;
-   here we remove the cap and use fluid side padding so the text is full width but
-   never touches the screen edge (min 24px, grows with the viewport, max 64px). */
+/* Full-width docs shell.
+   design-tokens.css caps the shell at --col-default (880px) / --col-wide (1080px).
+   docs.css is linked after it, so these rules win. Horizontal padding is kept so
+   text never sits flush against the viewport edge. */
 .he-shell,
 .he-shell--narrow,
 .he-shell--wide {
@@ -11,34 +12,89 @@
   padding-right: clamp(var(--sp-5), 4vw, var(--sp-8));
 }
 
-.he-layout { display: grid; grid-template-columns: 1fr; gap: var(--sp-6); }
-@media (min-width: 1024px) { .he-layout { grid-template-columns: 1fr 220px; } }
+.he-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--sp-6);
+}
+@media (min-width: 1024px) {
+  .he-layout {
+    grid-template-columns: 1fr 220px;
+  }
+}
+
 .he-main { min-width: 0; }
 
 .he-toc {
-  position: sticky; top: var(--sp-5); align-self: start;
+  position: sticky;
+  top: var(--sp-5);
+  align-self: start;
   padding: var(--sp-4) 0 var(--sp-4) var(--sp-4);
   border-left: 1px solid var(--border);
   font-size: var(--t-small-size);
-  max-height: calc(100vh - var(--sp-7)); overflow-y: auto;
+  max-height: calc(100vh - var(--sp-7));
+  overflow-y: auto;
 }
-.he-toc__label { font-size: var(--t-caption-size); letter-spacing: var(--t-caption-tracking); text-transform: uppercase; color: var(--fg-muted); margin: 0 0 var(--sp-3); }
+.he-toc__label {
+  font-size: var(--t-caption-size);
+  letter-spacing: var(--t-caption-tracking);
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  margin: 0 0 var(--sp-3);
+}
 .he-toc ul { list-style: none; padding: 0; margin: 0; }
 .he-toc li { margin: var(--sp-2) 0; }
 .he-toc__l3 { padding-left: var(--sp-3); }
 .he-toc a { color: var(--fg-muted); border: 0; }
 .he-toc a:hover { color: var(--clay); }
 
-.he-index-section { margin-top: var(--sp-7); }
-.he-index-section__head {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: var(--sp-4); margin-bottom: var(--sp-4); padding-bottom: var(--sp-3);
+/* Index page: section heading + link list */
+.he-index-summary { color: var(--fg-muted); font-size: var(--t-small-size); margin: 0 0 var(--sp-5); }
+.he-index-section { margin-top: var(--sp-6); }
+.he-index-section__title {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--t-h3-size);
+  font-weight: 500;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+.he-index-section__title a { color: inherit; text-decoration: none; }
+.he-index-section__title a:hover { color: var(--clay); }
+
+/* Compact title-only link list, shared by the root index and folder indexes */
+.he-linklist { list-style: none; margin: 0; padding: 0; }
+.he-linklist--folders { margin-bottom: var(--sp-5); }
+.he-linklist__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-2) 0;
   border-bottom: 1px solid var(--border);
 }
-.he-index-section__head h2 { margin: 0; font-size: var(--t-h2-size); font-weight: 500; }
-.he-index-section__blurb { color: var(--fg-muted); font-size: var(--t-small-size); margin: 0; max-width: 50ch; text-align: right; }
+.he-linklist__link { color: inherit; text-decoration: none; }
+.he-linklist__link:hover { color: var(--clay); text-decoration: underline; }
+.he-linklist__meta {
+  flex: none;
+  font-size: var(--t-caption-size);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
 
-.he-standalone-grid { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-.he-standalone-card { padding: var(--sp-4) var(--sp-4); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); }
-.he-standalone-card a { font-weight: 500; }
-.he-standalone-card p { font-size: var(--t-small-size); color: var(--fg-muted); margin: var(--sp-1) 0 0; }
+/* Folder pages */
+.he-bc { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin: var(--sp-4) 0; font-size: var(--t-small-size); }
+.he-bc__item { color: var(--fg-muted); text-decoration: none; }
+.he-bc__item:hover { color: var(--clay); text-decoration: underline; }
+.he-bc__sep { color: var(--border); }
+
+.he-folder-controls {
+  display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4);
+}
+.he-folder-controls label { font-size: var(--t-small-size); color: var(--fg-muted); font-weight: 500; }
+.he-sort-select {
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md); border: 1px solid var(--border);
+  background: var(--surface); color: inherit; font-size: var(--t-small-size);
+}
+
+.he-empty { color: var(--fg-muted); padding: var(--sp-5) 0; }

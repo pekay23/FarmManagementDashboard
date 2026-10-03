@@ -4,8 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>The LLM Council Framework · Hughes Farms</title>
-<link rel="stylesheet" href="./design-tokens.css">
-<link rel="stylesheet" href="./docs.css">
+<link rel="stylesheet" href="design-tokens.css">
+<link rel="stylesheet" href="docs.css">
 </head>
 <body>
 <div class="he-shell he-shell--wide">
@@ -14,30 +14,25 @@
   <a class="he-nav__brand" href="./index.html">Hughes Farms <small>docs</small></a>
   <div class="he-nav__links">
     <a href="./index.html">Index</a>
-    <a href="./index.html#overview">Overview</a>
-    <a href="./index.html#architecture">Architecture</a>
-    <a href="./index.html#audits">Audits</a>
-    <a href="./index.html#design">Design</a>
-    <a href="./index.html#guides">Guides</a>
-    <a href="./index.html#plans">Plans</a>
+    <a href="./architecture/index.html">Architecture</a>
+    <a href="./guides/index.html">Guides</a>
+    <a href="./plans/index.html">Plans</a>
+    <a href="./design/index.html">Design</a>
+    <a href="./audits/index.html">Audits</a>
   </div>
 </nav>
 <div class="he-layout">
 <main class="he-main">
 <header>
-  <p class="he-eyebrow">Overview</p>
+  <p class="he-eyebrow">Docs</p>
   <h1 class="he-title">The LLM Council Framework</h1>
   <p class="he-deck">The <strong>LLM Council</strong> is an advanced AI evaluation framework used by engineering and design teams to ensure robust, unbiased, and high-quality outcomes when reviewing code, architecture, or UX flows.</p>
 </header>
-
-<section class="he-section" id="what-is-it">
-  <div class="he-section__num">01 · What is it?</div>
-  <h2 class="he-section__title">What is it?</h2><p>Instead of relying on a single AI&#39;s output—which can be subject to bias, hallucinations, or &quot;sycophancy&quot;—the LLM Council framework simulates a &quot;debate&quot; among multiple distinct AI personas.</p>
-<p>These personas act as independent domain experts. They critique a given problem, review each other&#39;s opinions, and ultimately synthesize their findings into a balanced, comprehensive action plan.</p>
-
-<section class="he-section" id="the-personas">
-  <div class="he-section__num">02 · The Personas</div>
-  <h2 class="he-section__title">The Personas</h2><p>A typical LLM Council consists of:</p>
+<section class="he-section" id="what-is-it"><div class="he-section__num">01 · What is it?</div><h2 class="he-section__title">What is it?</h2></section>
+<p>Instead of relying on a single AI's output—which can be subject to bias, hallucinations, or &quot;sycophancy&quot;—the LLM Council framework simulates a &quot;debate&quot; among multiple distinct AI personas.</p>
+<p>These personas act as independent domain experts. They critique a given problem, review each other's opinions, and ultimately synthesize their findings into a balanced, comprehensive action plan.</p>
+<section class="he-section" id="the-personas"><div class="he-section__num">02 · The Personas</div><h2 class="he-section__title">The Personas</h2></section>
+<p>A typical LLM Council consists of:</p>
 <ol>
 <li><strong>The Performance Guru:</strong> Scrutinizes load times, rendering strategies, memory leaks, and Web Vitals.</li>
 <li><strong>The Accessibility Advocate:</strong> Ensures WCAG compliance, semantic HTML, ARIA standards, and screen-reader testing.</li>
@@ -45,20 +40,18 @@
 <li><strong>The UX/UI Designer:</strong> Evaluates user journeys, micro-interactions, responsive behavior, and overall aesthetic consistency.</li>
 <li><strong>The Chairman:</strong> Synthesizes the individual critiques, resolves conflicting recommendations, and proposes the final action plan.</li>
 </ol>
-
-<section class="he-section" id="the-3-stage-process">
-  <div class="he-section__num">03 · The 3-Stage Process</div>
-  <h2 class="he-section__title">The 3-Stage Process</h2><ol>
-<li><strong>First Opinions (Divergence):</strong> Each expert independently evaluates the codebase or feature without seeing the others&#39; thoughts.</li>
-<li><strong>Peer Review (Evaluation):</strong> The experts cross-examine each other&#39;s findings. For example, the UX Designer&#39;s heavy animation might be challenged by the Performance Guru.</li>
+<section class="he-section" id="the-3-stage-process"><div class="he-section__num">03 · The 3-Stage Process</div><h2 class="he-section__title">The 3-Stage Process</h2></section>
+<ol>
+<li><strong>First Opinions (Divergence):</strong> Each expert independently evaluates the codebase or feature without seeing the others' thoughts.</li>
+<li><strong>Peer Review (Evaluation):</strong> The experts cross-examine each other's findings. For example, the UX Designer's heavy animation might be challenged by the Performance Guru.</li>
 <li><strong>Synthesis (Convergence):</strong> The Chairman aggregates the valid points into a final, actionable summary.</li>
 </ol>
-
-<section class="he-section" id="usage-in-this-codebase">
-  <div class="he-section__num">04 · Usage in this Codebase</div>
-  <h2 class="he-section__title">Usage in this Codebase</h2><p>When using AI agents (like Claude Code, Antigravity, or others) to review significant pull requests, architecture decisions, or general audits, prompt them to:</p>
-<blockquote><p><em>&quot;Use the LLM Council framework to evaluate this feature/code.&quot;</em></p>
-</blockquote><p>The agents will automatically adopt these personas, deliberate the pros and cons, and return a highly vetted result.</p>
+<section class="he-section" id="usage-in-this-codebase"><div class="he-section__num">04 · Usage in this Codebase</div><h2 class="he-section__title">Usage in this Codebase</h2></section>
+<p>When using AI agents (like Claude Code, Antigravity, or others) to review significant pull requests, architecture decisions, or general audits, prompt them to:</p>
+<blockquote>
+<p><em>&quot;Use the LLM Council framework to evaluate this feature/code.&quot;</em></p>
+</blockquote>
+<p>The agents will automatically adopt these personas, deliberate the pros and cons, and return a highly vetted result.</p>
 
 </main>
 
@@ -73,7 +66,7 @@
 </aside>
 </div>
 <footer class="he-foot">
-  Source · <a href="./../">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
+  Source · <a href="..">browse the markdown</a> · rebuild with <code>bun run docs:html</code>
 </footer>
 </div>
 </body>
