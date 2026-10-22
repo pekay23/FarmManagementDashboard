@@ -1,0 +1,64 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommitsDisabled", ":disableRateLimiting"],
+  "dependencyDashboard": true,
+  "timezone": "UTC",
+  "schedule": ["before 5am on monday"],
+  "stabilityDays": 2,
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "rebaseWhen": "behind-base-branch",
+  "rangeStrategy": "replace",
+  "packageRules": [
+    {
+      "description": "Group non-major dependency updates into a single reviewable PR instead of one PR per package.",
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "non-major dependencies"
+    },
+    {
+      "description": "Group GitHub Actions version bumps into one PR.",
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions"
+    },
+    {
+      "description": "Group the React ecosystem.",
+      "matchPackageNames": ["react", "react-dom", "@types/react", "@types/react-dom"],
+      "groupName": "react ecosystem"
+    },
+    {
+      "description": "Group the Next.js ecosystem.",
+      "matchPackageNames": ["next", "eslint-config-next", "@next/*"],
+      "groupName": "next.js ecosystem"
+    },
+    {
+      "description": "Group Tailwind and related packages.",
+      "matchPackageNames": ["tailwindcss", "@tailwindcss/*", "postcss", "tailwind-merge"],
+      "groupName": "tailwind ecosystem"
+    },
+    {
+      "description": "Hold TypeScript majors for approval instead of blocking them. TypeScript 7 is the native compiler and no longer ships the JavaScript API that @typescript-eslint needs, so ESLint fails with \"TypeError: Cannot read properties of undefined (reading 'Cjs')\" and Next.js 16 aborts the build with \"It looks like you're trying to use TypeScript but do not have the required package(s) installed\". typescript-eslint's peer range is currently '>=4.8.4 <6.1.0'. Renovate still tracks the update and recreates the PR, so it can be approved and merged as soon as the toolchain supports it.",
+      "matchPackageNames": ["typescript"],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true,
+      "recreateWhen": "always"
+    },
+    {
+      "description": "Hold the `overrides` pins for approval: a change to a forced version can silently break the framework that depends on it.",
+      "matchPackageNames": ["sharp", "postcss", "serialize-javascript"],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true,
+      "recreateWhen": "always"
+    },
+    {
+      "description": "Renovate manages dependencies here, not Dependabot (dependabot_security_updates is disabled on this repository).",
+      "vulnerabilityAlerts": {
+        "labels": ["security"],
+        "dependencyDashboardApproval": true
+      }
+    }
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 4am on sunday"]
+  }
+}

@@ -1,0 +1,23 @@
+[install]
+# Use hoisted linker — single shared node_modules at the root (default for existing projects)
+linker = "hoisted"
+
+# Save lockfile in text format (bun.lock) — default since Bun 1.2
+saveTextLockfile = true
+
+# Install dev and peer dependencies
+dev = true
+peer = true
+
+# Opt-in global virtual store for up to 7x faster reinstalls.
+# Bun 1.4 keeps the install cache at ~/.bun/install/cache automatically;
+# this makes the store path explicit so CI and local machines share it.
+install_cache = true
+
+[run]
+# Auto-alias `node` to `bun` for all scripts — ensures consistency
+bun = true
+
+[test]
+# Run tests in parallel — Bun 1.4 ships a parallel test runner.
+parallel = true

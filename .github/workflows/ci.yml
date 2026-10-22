@@ -1,0 +1,286 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+
+      - name: Cache Bun install
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        timeout-minutes: 15
+
+      - name: Lint
+        run: bun run lint
+        timeout-minutes: 15
+
+      - name: Type check
+        run: bunx tsc --noEmit
+        timeout-minutes: 15
+
+      - name: Test
+        if: ${{ hashFiles('tests/**') != '' || hashFiles('**/*.test.ts') != '' }}
+        run: bun test
+        timeout-minutes: 15
+
+      - name: Validate build environment
+        run: |
+          node -e '
+            const req = ["DATABASE_URL", "NEXTAUTH_SECRET", "NEXTAUTH_URL"];
+            const missing = req.filter((k) => !process.env[k]);
+            if (missing.length) {
+              console.error(`::error::Missing build environment: ${missing.join(", ")}`);
+              process.exit(1);
+            }
+            const raw = process.env.NEXTAUTH_URL;
+            const candidate = raw.startsWith("http") ? raw : "https://" + raw;
+            try { new URL(candidate); }
+            catch { console.error("::error::NEXTAUTH_URL is not a valid URL"); process.exit(1); }
+            if (!/^postgres(ql)?:\/\//.test(process.env.DATABASE_URL)) {
+              console.error("::error::DATABASE_URL is not a Postgres connection string");
+              process.exit(1);
+            }
+            console.log("Build environment is valid.");
+          '
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+
+      - name: Build
+        run: bun run build
+        timeout-minutes: 20
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: 1
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: nextjs-build
+          path: .next
+          include-hidden-files: true
+          retention-days: 7
+
+  deploy-preview:
+    name: Deploy preview
+    needs: validate
+    if: >-
+      needs.validate.result == 'success'
+      && github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-preview-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    environment:
+      name: Preview
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify Vercel credentials are present
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::VERCEL_TOKEN secret is missing. The deploy was blocked, not attempted."
+            exit 1
+          fi
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL secret is missing. The build would fail with an undefined datasource, so the deploy was blocked, not attempted."
+            exit 1
+          fi
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Deploy to Vercel (preview)
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+        run: |
+          set +e
+          npx --yes vercel@64.3.1 deploy \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID" \
+            --project "$VERCEL_PROJECT_ID" \
+            --target preview \
+            --yes \
+            --build-env "DATABASE_URL=$DATABASE_URL" \
+            --build-env "NEXTAUTH_SECRET=$NEXTAUTH_SECRET" \
+            --build-env "NEXTAUTH_URL=$NEXTAUTH_URL" \
+            --meta githubDeployment=1 \
+            --meta githubCommitSha="$GITHUB_SHA" \
+            --meta githubCommitRef="$GITHUB_REF_NAME" \
+            --meta githubRepo=FarmManagementDashboard \
+            --meta githubOrg=pekay23 \
+            --json > deployment.json
+          CLI_EXIT=$?
+          set -e
+
+          if [ ! -s deployment.json ]; then
+            echo "::error::The Vercel CLI produced no output (exit code $CLI_EXIT)."
+            exit 1
+          fi
+
+          DEPLOY_ID=$(node -e "try{const d=JSON.parse(require('fs').readFileSync('deployment.json','utf8'));process.stdout.write(d.id||d.uid||((d.deployment||{}).id)||((d.deployment||{}).uid)||'')}catch(e){process.stdout.write('')}")
+          URL=$(node -e "try{const d=JSON.parse(require('fs').readFileSync('deployment.json','utf8'));process.stdout.write(d.url||((d.deployment||{}).url)||'')}catch(e){process.stdout.write('')}")
+
+          if [ -z "$DEPLOY_ID" ]; then
+            echo "::error::Could not read the deployment id from the Vercel CLI output (exit code $CLI_EXIT):"
+            cat deployment.json
+            exit 1
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployment id: $DEPLOY_ID"
+
+          for i in $(seq 1 60); do
+            STATE=$(curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v13/deployments/$DEPLOY_ID" \
+              | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const j=JSON.parse(s);process.stdout.write(j.readyState||j.state||'')}catch(e){process.stdout.write('')}})")
+            case "$STATE" in
+              READY|ERROR|CANCELED)
+                echo "Deployment $DEPLOY_ID finished with state $STATE"
+                if [ "$STATE" != "READY" ]; then
+                  echo "::error::Vercel deployment failed with state $STATE"
+                  exit 1
+                fi
+                echo "Deployed preview: $URL"
+                exit 0
+                ;;
+            esac
+            sleep 10
+          done
+          echo "::error::Timed out waiting for deployment $DEPLOY_ID to finish"
+          exit 1
+
+  deploy-production:
+    name: Deploy production
+    needs: validate
+    if: >-
+      needs.validate.result == 'success'
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    environment:
+      name: Production
+      url: https://farm-management-dashboard.vercel.app
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify Vercel credentials are present
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::VERCEL_TOKEN secret is missing. The deploy was blocked, not attempted."
+            exit 1
+          fi
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL secret is missing. The build would fail with an undefined datasource, so the deploy was blocked, not attempted."
+            exit 1
+          fi
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Deploy to Vercel (production)
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+        run: |
+          set +e
+          npx --yes vercel@64.3.1 deploy \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID" \
+            --project "$VERCEL_PROJECT_ID" \
+            --target production \
+            --yes \
+            --build-env "DATABASE_URL=$DATABASE_URL" \
+            --build-env "NEXTAUTH_SECRET=$NEXTAUTH_SECRET" \
+            --build-env "NEXTAUTH_URL=$NEXTAUTH_URL" \
+            --meta githubDeployment=1 \
+            --meta githubCommitSha="$GITHUB_SHA" \
+            --meta githubCommitRef="$GITHUB_REF_NAME" \
+            --meta githubRepo=FarmManagementDashboard \
+            --meta githubOrg=pekay23 \
+            --json > deployment.json
+          CLI_EXIT=$?
+          set -e
+
+          if [ ! -s deployment.json ]; then
+            echo "::error::The Vercel CLI produced no output (exit code $CLI_EXIT)."
+            exit 1
+          fi
+
+          DEPLOY_ID=$(node -e "try{const d=JSON.parse(require('fs').readFileSync('deployment.json','utf8'));process.stdout.write(d.id||d.uid||((d.deployment||{}).id)||((d.deployment||{}).uid)||'')}catch(e){process.stdout.write('')}")
+          URL=$(node -e "try{const d=JSON.parse(require('fs').readFileSync('deployment.json','utf8'));process.stdout.write(d.url||((d.deployment||{}).url)||'')}catch(e){process.stdout.write('')}")
+
+          if [ -z "$DEPLOY_ID" ]; then
+            echo "::error::Could not read the deployment id from the Vercel CLI output (exit code $CLI_EXIT):"
+            cat deployment.json
+            exit 1
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployment id: $DEPLOY_ID"
+
+          for i in $(seq 1 60); do
+            STATE=$(curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v13/deployments/$DEPLOY_ID" \
+              | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const j=JSON.parse(s);process.stdout.write(j.readyState||j.state||'')}catch(e){process.stdout.write('')}})")
+            case "$STATE" in
+              READY|ERROR|CANCELED)
+                echo "Deployment $DEPLOY_ID finished with state $STATE"
+                if [ "$STATE" != "READY" ]; then
+                  echo "::error::Vercel deployment failed with state $STATE"
+                  exit 1
+                fi
+                echo "Deployed production: $URL"
+                exit 0
+                ;;
+            esac
+            sleep 10
+          done
+          echo "::error::Timed out waiting for deployment $DEPLOY_ID to finish"
+          exit 1

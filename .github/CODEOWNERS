@@ -1,0 +1,26 @@
+# Default owner for everything in this repository.
+* @pekay23
+
+# CI and release plumbing: changes here can bypass the quality gates that
+# branch protection requires, so they get explicit review attention.
+/.github/workflows/ @pekay23
+/.github/CODEOWNERS @pekay23
+/renovate.json @pekay23
+
+# The deploy contract: this file decides whether Vercel deploys on Git pushes.
+/vercel.json @pekay23
+
+# Dependency manifests and the lockfile.
+/package.json @pekay23
+/bun.lock @pekay23
+/bunfig.toml @pekay23
+/next.config.ts @pekay23
+
+# Auth and shared API helpers.
+/lib/auth.ts @pekay23
+/lib/api.ts @pekay23
+/lib/db.ts @pekay23
+/proxy.ts @pekay23
+
+# API surface.
+/app/api/ @pekay23
