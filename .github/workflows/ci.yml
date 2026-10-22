@@ -5,6 +5,7 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -46,8 +47,12 @@ jobs:
         timeout-minutes: 15
 
       - name: Test
-        if: ${{ hashFiles('tests/**') != '' || hashFiles('**/*.test.ts') != '' }}
-        run: bun test
+        run: |
+          if ls *.test.ts tests/**/*.test.ts 1>/dev/null 2>&1; then
+            bun test
+          else
+            echo "No test files found — skipping test gate"
+          fi
         timeout-minutes: 15
 
       - name: Validate build environment
