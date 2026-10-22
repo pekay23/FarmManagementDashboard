@@ -9,53 +9,53 @@ repo root). Production URL: **https://farm-management-dashboard.vercel.app**
 
 - Framework preset: `nextjs`
 - Install command: `bun install`
-- Build command: `bun run build` (Turbopack build is the future, see
-  [Future plans → Turbopack-for-prod](../plans/future-plans.md))
+- Build command: `bun run build` (Turbopack via `next dev --turbopack`)
 - Region: `iad1` (US East, matches the Neon Postgres region)
-- GitHub auto-aliasing on, so each push to `main` gets a production
-  alias and every PR gets a preview URL
-- Service-worker-friendly headers on `/sw.js` and `/workbox-*`
-- Minimal security headers (`X-Content-Type-Options`, `X-Frame-Options`,
-  `Referrer-Policy`)
+- **Git auto-deploy disabled** (`git.deploymentEnabled: false`, `github.enabled: false`)
+  so Vercel cannot auto-deploy on push/PR — CI is the only deploy path
+- Security headers on `/api/:path*` (moved into `next.config.ts` for all routes)
+- Service-worker headers removed (PWA/next-pwa retired)
+
+## Vercel CI-gated deployment (primary)
+
+Deployments flow exclusively through `.github/workflows/ci.yml`:
+
+1. **validate** job (runs on every push/PR to `main`):
+   `bun install --frozen-lockfile` → lint → type-check → test → build-env
+   validation → `bun run build`, all with `DATABASE_URL`, `NEXTAUTH_SECRET`,
+   `NEXTAUTH_URL` from GitHub Secrets.
+2. **deploy-preview** job (PRs only): `vercel deploy --target preview`,
+   gated on `validate == success`. Fork PRs never deploy.
+3. **deploy-production** job (push to `main` only): `vercel deploy --target
+   production`, gated on `validate == success`. Runs in the `Production`
+   environment (restricted to `main`).
+
+The Vercel GitHub App and Netlify Git integrations are disconnected so no
+path exists outside CI to deploy to Vercel. `vercel.json` is under
+`/.github/CODEOWNERS` so any change to the deploy contract requires review.
 
 ### First-time setup
 
-1. Push the repo to GitHub.
+1. Push the repo to GitHub (branch `main` is protected).
 2. In Vercel, **Add new project → Import** the repo. Vercel auto-detects
    Next.js 16 + bun and applies `vercel.json`.
-3. **Project → Settings → Environment Variables** — copy the three vars
-   from `.env.local` (or from this table):
+3. **Disconnect** the project from GitHub in the Vercel dashboard
+   (Settings → Git) so auto-deploy is off at the platform level.
+4. **Project → Settings → Environment Variables** — set for Production +
+   Preview:
+   `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`.
+5. **GitHub repository Secrets** — mirror the same values:
+   `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `VERCEL_TOKEN`.
+6. **GitHub repository Variables**:
+   `VERCEL_ORG_ID` (`team_xtlPeu6qXAdmKjbOmUWWY35o`),
+   `VERCEL_PROJECT_ID` (`prj_QE0NhKb6d2GqT83xk85ar6rC4diq`).
 
-   | Var               | Value (example)                                                                            |
-   | ----------------- | ------------------------------------------------------------------------------------------ |
-   | `DATABASE_URL`    | `postgresql://neondb_owner:…@ep-purple-boat-…neon.tech/neondb?sslmode=require&…`           |
-   | `NEXTAUTH_URL`    | `https://farm-management-dashboard.vercel.app/`                                            |
-   | `NEXTAUTH_SECRET` | 32+ random bytes (generate with `openssl rand -base64 32`)                                |
+### Branch protection
 
-   Set them for **all three** environments (Production, Preview,
-   Development). The values can be identical if you use the same DB
-   for all three — otherwise see [Branches & environments](#branches--environments).
+`main` is protected: required PR, required `validate` status check,
+strict (up-to-date) branches, no force push, no deletions, admins enforced,
+conversation resolution required.
 
-4. **Deploy**. First build runs `bun install` (postinstall patch is
-   safe in CI) followed by `bun run build`.
-
-### Branches & environments
-
-| Branch         | Vercel env  | URL                                              |
-| -------------- | ----------- | ------------------------------------------------ |
-| `main`         | Production  | `https://farm-management-dashboard.vercel.app`    |
-| any other      | Preview     | `https://farm-management-dashboard-<hash>.vercel.app` |
-| PR branch      | Preview     | `https://farm-management-dashboard-git-<branch>-<user>.vercel.app` |
-
-By default, Preview deploys point at the **same** Neon database as
-Production. To use a separate staging DB, add a `DATABASE_URL_STAGING`
-env var and override it in the Preview environment.
-
-### Continuous deployment
-
-Every push to `main` triggers a **production** deploy (because
-`autoAlias: true` in `vercel.json`). Pull requests get a **preview**
-URL automatically.
 
 ## Local preview against production data
 
