@@ -46,7 +46,11 @@ The data model already stores strings in plain English (`name`,
 common languages on Ghanaian smallholdings), swap the column types
 to JSONB keyed by locale, and use `next-intl` for UI strings.
 
-## Replace `next-pwa` with Workbox direct
+## Historical proposal: service worker strategy
+
+The current package manifest does not include `next-pwa`. Reassess the desired offline experience and installed dependencies before pursuing this proposal.
+
+### Earlier proposal
 
 `next-pwa` is barely maintained. Migrate to hand-rolled Workbox
 in `public/sw.js`, which is already a partial dependency via

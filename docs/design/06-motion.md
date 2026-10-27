@@ -42,9 +42,7 @@ slide uses `transition-transform duration-300` with no explicit easing
 <div className="animate-in fade-in zoom-in-95 duration-200">
 ```
 
-(Provided by the `tailwindcss-animate` plugin, which `next-pwa` already
-pulls in transitively in older versions; if not present, add it to
-`package.json`.)
+Verify that the current CSS and installed animation utilities provide these classes before using them.
 
 ### KPI card lift
 

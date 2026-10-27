@@ -58,18 +58,7 @@ explicitly via the wrapper:
 
 ## The farm logo
 
-A hand-drawn tractor-with-fields SVG, embedded as a base64 string in
-`lib/logo.ts` and re-used by:
-
-- the sidebar header (the green tile + "Hughes Farms" wordmark);
-- the login page (the larger 24-px icon above the sign-in form);
-- PDF exports (decoded and rendered into the header by
-  `lib/pdfUtils.ts` via `canvg`).
-
-The base64 inlining keeps the PDF-export path synchronous and avoids
-any `fetch` of an asset at runtime. To replace the logo, drop a new
-SVG into `public/farmslogo.svg` and regenerate the base64 constant
-with the helper in `convert_logo.py` at the repo root.
+`public/logo.png` is the default logo. The sidebar can use a logo supplied by the active branding settings, and PDF-related screens fetch the default image when no user logo is available. Check the relevant component before changing a logo asset.
 
 ## Illustrations
 

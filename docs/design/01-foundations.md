@@ -33,7 +33,7 @@
 | Dark-mode toggle      | `next-themes` via `components/ThemeProvider.tsx` |
 | Theme toggle button   | `components/ThemeToggle.tsx` (in Sidebar)  |
 | Sidebar gradient      | `.bg-sidebar-gradient` utility in `globals.css` |
-| Logo                  | `lib/logo.ts` (base64-embedded SVG)         |
+| Logo                  | `public/logo.png` (default logo; branding can override it)         |
 
 ## Hex cheat-sheet
 
