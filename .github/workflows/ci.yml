@@ -24,7 +24,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
 
       - name: Cache Bun install
         uses: actions/cache@v6
@@ -88,15 +88,6 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: nextjs-build
-          path: .next
-          include-hidden-files: true
-          retention-days: 7
 
   deploy-preview:
     name: Deploy preview
