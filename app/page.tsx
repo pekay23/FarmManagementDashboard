@@ -69,7 +69,7 @@ export default function MarketingPage() {
           </div>
         </section>
 
-        {featureBlocks.map((block, i) => (
+        {featureBlocks.map((block) => (
           <SplitFeature
             key={block.eyebrow}
             eyebrow={block.eyebrow}

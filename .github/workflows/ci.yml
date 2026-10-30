@@ -131,7 +131,7 @@ jobs:
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
         run: |
           set +e
-          npx --yes vercel@64.3.1 deploy \
+          bunx vercel@64.3.1 deploy \
             --token "$VERCEL_TOKEN" \
             --scope "$VERCEL_ORG_ID" \
             --project "$VERCEL_PROJECT_ID" \
@@ -227,7 +227,7 @@ jobs:
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
         run: |
           set +e
-          npx --yes vercel@64.3.1 deploy \
+          bunx vercel@64.3.1 deploy \
             --token "$VERCEL_TOKEN" \
             --scope "$VERCEL_ORG_ID" \
             --project "$VERCEL_PROJECT_ID" \
