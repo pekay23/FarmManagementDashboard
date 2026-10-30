@@ -1,16 +1,15 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { Toaster } from "sonner";
 import "./globals.css";
 import Providers from "@/components/Providers";
-import AppShell from "@/components/AppShell";
+import { Toaster } from "sonner";
 import { SyncProvider } from "@/context/SyncContext";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "FieldOps",
-  description: "Farm operations workspace",
+  title: "FarmOps — Farm Management Software",
+  description: "Run your farm from one place. Track livestock, crops, sales, expenses, and inventory — online or off.",
   manifest: '/site.webmanifest',
   icons: {
     icon: [
@@ -29,15 +28,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // `suppressHydrationWarning` is required by next-themes — the
-    // script it injects to set the theme class runs before React
-    // hydrates and would otherwise produce a warning.
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${inter.className} bg-background text-foreground`}>
         <Providers>
           <SyncProvider>
             <Toaster position="top-right" richColors />
-            <AppShell>{children}</AppShell>
+            {children}
           </SyncProvider>
         </Providers>
       </body>

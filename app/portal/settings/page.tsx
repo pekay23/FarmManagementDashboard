@@ -6,7 +6,7 @@ import { Save, RefreshCw, Server, User, Database, Globe, Download, LogOut, Smart
 import { db } from '@/lib/db';
 import { signOut, useSession } from 'next-auth/react';
 import { useSync } from '@/context/SyncContext';
-import packageInfo from '../../package.json';
+import packageInfo from '../../../package.json';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('general');
