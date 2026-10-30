@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { MarketingNav } from "@/components/marketing/layouts/MarketingNav";
 import { MarketingFooter } from "@/components/marketing/layouts/MarketingFooter";
 import { MarketingHero } from "@/components/marketing/sections/Hero";

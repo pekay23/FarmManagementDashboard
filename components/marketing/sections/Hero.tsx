@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Plus, Activity, Sprout, DollarSign } from "lucide-react";
+import { Plus, Activity, DollarSign } from "lucide-react";
 
 export function MarketingHero() {
   const [scrollY, setScrollY] = useState(0);
@@ -105,7 +105,7 @@ export function MarketingHero() {
   );
 }
 
-function FeatureStat({ icon: Icon, label, color }: { icon: React.ReactNode; label: string; color: string }) {
+function FeatureStat({ icon: Icon, label, color }: { icon: React.ElementType; label: string; color: string }) {
   return (
     <div className={`p-4 rounded-xl flex items-center gap-3 ${color}`}>
       <Icon className="w-5 h-5" />

@@ -67,7 +67,7 @@ export function SplitFeature({
 
               {points && points.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {points.map((p, i) => {
+                  {points.map((p) => {
                     const Icon = icons[p.split(" ")[0]] || Sprout;
                     return (
                       <div

@@ -17,7 +17,7 @@ export function ProcessTimeline() {
         </div>
 
         <div className="space-y-0">
-          {PROCESS.map((step, i) => (
+          {PROCESS.map((step) => (
             <div key={step.phase} className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-24 py-8 border-t border-[#2c3e32]/14 last:border-b border-[#2c3e32]/14">
               <div className="lg:col-span-2 flex items-baseline gap-2">
                 <span className="fm-eyebrow text-[#667568]">{step.phase}</span>

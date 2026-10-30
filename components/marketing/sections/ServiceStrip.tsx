@@ -60,7 +60,7 @@ export function ServiceStrip() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {services.map((item, i) => (
+          {services.map((item) => (
             <a
               key={item.id}
               href={item.href}
